@@ -15,7 +15,7 @@ n_inputs = get_var('n_inputs', 'defaults', defaults, varargin{:});
 
 
 %SPECT_POWER Generates a block which computes the magnitude squared 
-% of a n_inputs complex numbers
+% of N complex numbers
 
 sync_in = xInport('sync_in');
 sync_out = xOutport('sync_out');
@@ -53,6 +53,4 @@ sync_delay_block = xBlock( struct('source', 'Delay', 'name', 'sync_delay'), ...
     {sync_in}, ...
     {sync_out});
 
-
 end
-
