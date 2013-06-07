@@ -48,8 +48,8 @@ defaults = {'FFTSize', 2, ...
     'coeff_bit_width', 18, ...
     'quantization', 'Round  (unbiased: +/- Inf)', ...
     'overflow', 'Saturate', ...
-    'add_latency', 1, ...
-    'mult_latency', 2, ...
+    'add_latency', 2, ...
+    'mult_latency', 3, ...
     'bram_latency', 2, ...
     'conv_latency', 1, ...
     'negate_latency', 3, ...
@@ -106,18 +106,20 @@ bit_growth_chart
 input_b_w = input_bit_width;
 coeff_b_w = coeff_bit_width;
 
+%% Inports
 sync = xInport('sync');
 shift = xInport('shift');
 pol1 = xInport('pol1');
 pol2 = xInport('pol2');
 
+%% Outports
 sync_out = xOutport('sync_out');
 out1 = xOutport('out1');
 out2 = xOutport('out2');
 of = xOutport('of');
 
-
-
+%% Diagram
+% Dummy overflow input to the first stage
 of_in = xSignal;
 
 xBlock( struct('name', 'Constant', 'source', 'Constant'), ...
@@ -127,18 +129,18 @@ xBlock( struct('name', 'Constant', 'source', 'Constant'), ...
 
 Counter_out1 = xSignal;
 biplex_sel = xSignal;
-Counter = xBlock(struct('source', 'Counter', 'name', 'biplex_sel_counter'), ...
-	struct('n_bits', FFTSize-1+1, 'rst', 'on', 'explicit_period', 'off', ...
-		'use_rpm', 'off'), {sync}, {Counter_out1});
-
-Slice1 = xBlock(struct('source', 'Slice', 'name', 'Slice1'), ...
-	struct('bit1', -0), {Counter_out1}, {biplex_sel});	
+% Counter = xBlock(struct('source', 'Counter', 'name', 'biplex_sel_counter'), ...
+% 	struct('n_bits', FFTSize-1+1, 'rst', 'on', 'explicit_period', 'off', ...
+% 		'use_rpm', 'off'), {sync}, {Counter_out1});
+% 
+% Slice1 = xBlock(struct('source', 'Slice', 'name', 'Slice1'), ...
+% 	struct('bit1', -0), {Counter_out1}, {biplex_sel});	
 	
 stage_for_last_counter = 1;	
-stage_latencies = get_biplex_stage_latencies(varargin{:})
+% stage_latencies = get_biplex_stage_latencies(varargin{:})
 
 % Create/Delete Stages
-stage_inputs = {pol1, pol2, of_in, sync, shift, biplex_sel};
+stage_inputs = {pol1, pol2, of_in, sync, shift};
 for a=1:FFTSize,
 
 	%if delays occupy larger space than specified then implement in BRAM
@@ -189,8 +191,9 @@ for a=1:FFTSize,
 	stage_out2 = xSignal;
 	stage_of = xSignal;
 	stage_sync_out = xSignal;
+    shift_out = xSignal();
 	
-	stage_outports = {stage_out1, stage_out2, stage_of, stage_sync_out};
+	stage_outports = {stage_out1, stage_out2, stage_of, stage_sync_out, shift_out};
 	use_dsp48_mults
 	xBlock( struct('name', stage_name, 'source', str2func('fft_stage_n_init_xblock')), ...
 		{ [blk,'/',stage_name], ...
@@ -220,36 +223,36 @@ for a=1:FFTSize,
 		stage_inputs, ...
 		stage_outports );
 	stage_inputs = stage_outports;
-	stage_inputs{5} = shift;
+% 	stage_inputs{5} = shift;
 	
-	del_to_last_counter = sum( stage_latencies(stage_for_last_counter:a) );
-	counter_ffs = a;
-	del_ffs = ceil(del_to_last_counter/16);
-	
-	
-	if (a < FFTSize) && (del_ffs < counter_ffs)
-		biplex_sel = xSignal;	
-		counter_bit = xSignal;
-		xBlock(struct('source', 'Slice', 'name', sprintf('Slice%d', a+1)), ...
-			struct('bit1', -a), {Counter_out1}, {counter_bit});
-		
-		sync_delay_config.source = 'Delay';
-		sync_delay_config.name = sprintf('del_stage_%d', a+1);
-		xBlock(sync_delay_config, {'latency', del_to_last_counter}, {counter_bit}, ...
-			{biplex_sel});
-		stage_inputs{6} = biplex_sel;
-	elseif a < FFTSize % instantiate counter
-		Counter_out1 = xSignal;
-		Counter = xBlock(struct('source', 'Counter', 'name', sprintf('stage_%d_cnt', a+1)), ...
-			struct('n_bits', FFTSize-a, 'rst', 'on', 'explicit_period', 'off', ...
-				'use_rpm', 'off'), {stage_sync_out}, {Counter_out1});
-		
-		biplex_sel = xSignal;	
-		xBlock(struct('source', 'Slice', 'name', sprintf('Slice%d', a+1)), ...
-			struct('bit1', -0), {Counter_out1}, {biplex_sel});
-
-		stage_inputs{6} = biplex_sel;	
-	end
+% 	del_to_last_counter = sum( stage_latencies(stage_for_last_counter:a) );
+% 	counter_ffs = a;
+% 	del_ffs = ceil(del_to_last_counter/16);
+% 	
+% 	
+% 	if (a < FFTSize) && (del_ffs < counter_ffs)
+% 		biplex_sel = xSignal;	
+% 		counter_bit = xSignal;
+% 		xBlock(struct('source', 'Slice', 'name', sprintf('Slice%d', a+1)), ...
+% 			struct('bit1', -a), {Counter_out1}, {counter_bit});
+% 		
+% 		sync_delay_config.source = 'Delay';
+% 		sync_delay_config.name = sprintf('del_stage_%d', a+1);
+% 		xBlock(sync_delay_config, {'latency', del_to_last_counter}, {counter_bit}, ...
+% 			{biplex_sel});
+% 		stage_inputs{6} = biplex_sel;
+% 	elseif a < FFTSize % instantiate counter
+% 		Counter_out1 = xSignal;
+% 		Counter = xBlock(struct('source', 'Counter', 'name', sprintf('stage_%d_cnt', a+1)), ...
+% 			struct('n_bits', FFTSize-a, 'rst', 'on', 'explicit_period', 'off', ...
+% 				'use_rpm', 'off'), {stage_sync_out}, {Counter_out1});
+% 		
+% 		biplex_sel = xSignal;	
+% 		xBlock(struct('source', 'Slice', 'name', sprintf('Slice%d', a+1)), ...
+% 			struct('bit1', -0), {Counter_out1}, {biplex_sel});
+% 
+% 		stage_inputs{6} = biplex_sel;	
+% 	end
     
     % for bit growth FFT
     input_b_w = input_b_w + bit_growth_chart(a);

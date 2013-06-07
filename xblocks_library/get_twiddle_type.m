@@ -19,18 +19,22 @@
 %   51 Franklin Street, Fifth Floor, Boston, MA 02110-1301 USA.               %
 %                                                                             %
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-function twiddle_type = get_twiddle_type(Coeffs, biplex, opt_target, use_embedded,StepPeriod,FFTSize)
+function twiddle_type = get_twiddle_type(Coeffs, biplex, opt_target, use_embedded, StepPeriod, FFTSize, varargin)
 
+defaults = {'direct_tail', 0};
+direct_tail = get_var('direct_tail', 'defaults', defaults, varargin{:});
 
 opt_logic = strcmp(opt_target, 'logic');
 use_embedded = strcmp(use_embedded,'on');
-
+biplex = strcmp(biplex, 'on');
 
 % Determine twiddle type from 'Coeffs'
+fprintf('Determining twiddle type...\n')
+fprintf('%d coeffs in stage\n', length(Coeffs))
 if length(Coeffs) == 1,
     if Coeffs(1) == 0,
         %if used in biplex core and first stage
-        if(strcmp(biplex, 'on')),
+        if biplex || direct_tail
             twiddle_type = 'twiddle_pass_through';
         else
             twiddle_type = 'twiddle_coeff_0';
@@ -57,6 +61,5 @@ else
         twiddle_type = 'twiddle_general_3mult';
     end
 end
-
 
 end

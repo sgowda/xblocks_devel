@@ -90,18 +90,17 @@ in2 = xInport('in2');
 of_in = xInport('of_in');
 sync = xInport('sync');
 shift = xInport('shift');
-biplex_sel = xInport('biplex_sel');
+% biplex_sel = xInport('biplex_sel');
 
 %% outports
 out1 = xOutport('out1');
 out2 = xOutport('out2');
 of = xOutport('of');
 sync_out = xOutport('sync_out');
+shift_out = xOutport('shift_out');
+shift_out.assign(shift); % propagate to next stage
 
 %% diagram
-
-
-
 %flag error and over-ride if trying to use BRAMs but delay is less than BRAM latency
 if (2^(FFTSize-FFTStage) <= bram_latency)
     if strcmp(delays_bram,'on')
@@ -122,7 +121,13 @@ else
 end
 StepPeriod = FFTSize-FFTStage;
 
+% Compute the complex, bit-reversed values of the twiddle factors
+br_indices = bit_rev(Coeffs, FFTSize-1);
+br_indices = -2*pi*1j*br_indices/2^FFTSize;
+ActualCoeffs = exp(br_indices);
 
+%% Signals
+w = xSignal('w');
 
 % block: untitled2/fft_stage_n_init_xblock/Logical1
 butterfly_direct_out3 = xSignal;
@@ -138,15 +143,17 @@ Logical1 = xBlock(struct('source', 'Logical', 'name', 'Logical1'), ...
 
 delay_f_out1 = xSignal;
 Mux_out1 = xSignal;
+Counter_out1 = xSignal;
+Slice1_out1 = xSignal;
 Mux = xBlock(struct('source', 'Mux', 'name', 'Mux'), ...
 	struct('latency', mux_latency, 'Precision', 'Full'), ...
-	{biplex_sel, delay_f_out1, in1}, {Mux_out1});
+	{Slice1_out1, delay_f_out1, in1}, {Mux_out1});
 
 % block: untitled2/fft_stage_n_init_xblock/Mux1
 Mux1_out1 = xSignal;
 Mux1 = xBlock(struct('source', 'Mux', 'name', 'Mux1'), ...
 	struct('latency', mux_latency, 'Precision', 'Full'), ...
-	{biplex_sel, in1, delay_f_out1}, {Mux1_out1});
+	{Slice1_out1, in1, delay_f_out1}, {Mux1_out1});
 
 % block: untitled2/fft_stage_n_init_xblock/Slice
 Slice_out1 = xSignal;
@@ -159,24 +166,37 @@ Slice = xBlock(struct('source', 'Slice', 'name', 'Slice'), ...
                       {Slice_out1});
 
 % block: untitled2/fft_stage_n_init_xblock/Counter
-%Counter_out1 = xSignal;
-%Slice1_out1 = xSignal;
-%Counter = xBlock(struct('source', 'Counter', 'name', 'Counter'), ...
-%                        struct('n_bits', FFTSize-FFTStage+1, ...
-%                               'rst', 'on', ...
-%                               'explicit_period', 'off', ...
-%                               'use_rpm', 'off'), ...
-%                        {sync}, ...
-%                        {Counter_out1});
+
+Counter = xBlock(struct('source', 'Counter', 'name', 'Counter'), ...
+                       struct('n_bits', FFTSize-FFTStage+1, ...
+                              'rst', 'on', ...
+                              'explicit_period', 'off', ...
+                              'use_rpm', 'off'), ...
+                       {sync}, ...
+                       {Counter_out1});
 % block: untitled2/fft_stage_n_init_xblock/Slice1
-%Slice1 = xBlock(struct('source', 'Slice', 'name', 'Slice1'), ...
-%                       [], ...
-%                       {Counter_out1}, ...
-%                       {Slice1_out1});
+Slice1 = xBlock(struct('source', 'Slice', 'name', 'Slice1'), ...
+                      [], ...
+                      {Counter_out1}, ...
+                      {Slice1_out1});
+
+
+if FFTStage == 1
+    twiddle_type = 'twiddle_pass_through';
+    coeff_latency = 0;
+elseif FFTStage == 2
+    twiddle_type = 'twiddle_stage_2';
+    coeff_latency = 0;
+else
+    twiddle_type = 'twiddle_general_4mult';
+    coeff_latency = bram_latency;
+end
 
 delay_b_out1 = xSignal;
 sync_delay_out1 = xSignal;
-use_embedded
+sync_coeff_delay = xSignal('sync_coeff_delay');
+a_coeff_delay = xSignal('a_coeff_delay');
+b_coeff_delay = xSignal('b_coeff_delay');
 butterfly_direct_sub = xBlock(struct('source', str2func('fft_butterfly_init_xblock'), 'name', 'butterfly_direct'), ...
                                  { [blk,'/butterfly_direct'], ...
                                   'biplex', 'on', ...
@@ -202,19 +222,34 @@ butterfly_direct_sub = xBlock(struct('source', str2func('fft_butterfly_init_xblo
 								  'downshift', downshift, ...
 								  'dsp48_adders', dsp48_adders, ...
 								  'use_dsp48_mults', use_dsp48_mults, ...
-                                  'bit_growth', bit_growth}, ...
-                                 {delay_b_out1, Mux_out1, sync_delay_out1, Slice_out1}, ...
+                                  'bit_growth', bit_growth, ...
+                                  'twiddle_type', twiddle_type}, ...
+                                 {a_coeff_delay, b_coeff_delay, w, sync_coeff_delay, Slice_out1}, ...
                                  {out1, out2, butterfly_direct_out3, sync_out});
 
+
+                             
 % block: untitled2/fft_stage_n_init_xblock/sync_delay
 sync_delay_sub = xBlock(struct('source', str2func('sync_delay_init_xblock'), 'name', 'sync_delay'), ...
                            {[blk,'/sync_delay'], 2^(FFTSize - FFTStage)+mux_latency}, ...
                            {sync}, ...
                            {sync_delay_out1});
+
+% Delay a, b, and sync to match coefficient latency (e.g. bram delay)
+xBlock(struct('source', 'Delay', 'name', 'sync_coeff_delay'), ...
+    {'latency', coeff_latency}, {sync_delay_out1}, {sync_coeff_delay});
+xBlock(struct('source', 'Delay', 'name', 'a_coeff_delay'), ...
+    {'latency', coeff_latency}, {delay_b_out1}, {a_coeff_delay});
+xBlock(struct('source', 'Delay', 'name', 'b_coeff_delay'), ...
+    {'latency', coeff_latency}, {Mux_out1}, {b_coeff_delay});
+
+
+% Coefficient generator
+xBlock(struct('source', str2func('coeff_gen_init_xblock'), 'name', 'coeff_gen'), ...
+    {[], ActualCoeffs, coeff_bit_width, StepPeriod, bram_latency, coeffs_bram}, ...
+    {sync_delay_out1}, {w});
                            
-                           
-                           
-% Implement delays normally or in BRAM
+% Implement delays using fabric or BRAM
 % TODO: use the "combined" delay block
 if strcmp(delays_bram, 'on')
 	% instantiate delay_b
@@ -245,15 +280,15 @@ else
 end                           
 
 
-if ~isempty(blk) && ~strcmp(blk(1),'/')
-    clean_blocks(blk);
-    del = 'slices';
-    coeff = 'slices';
-    if strcmp(delays_bram,'on') del = 'BRAM'; end
-    if strcmp(coeffs_bram,'on') coeff = 'BRAM'; end
-
-    fmtstr = sprintf('[%d/%d]\ndelays in %s\ncoeffs in %s\nBit growth = %d\n', FFTStage, FFTSize, del, coeff,bit_growth);
-    set_param(blk, 'AttributesFormatString', fmtstr);
-end
+% if ~isempty(blk) && ~strcmp(blk(1),'/')
+%     clean_blocks(blk);
+%     del = 'slices';
+%     coeff = 'slices';
+%     if strcmp(delays_bram,'on') del = 'BRAM'; end
+%     if strcmp(coeffs_bram,'on') coeff = 'BRAM'; end
+% 
+%     fmtstr = sprintf('[%d/%d]\ndelays in %s\ncoeffs in %s\nBit growth = %d\n', FFTStage, FFTSize, del, coeff,bit_growth);
+%     set_param(blk, 'AttributesFormatString', fmtstr);
+% end
 end
 

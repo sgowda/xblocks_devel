@@ -23,6 +23,7 @@ function fft_twiddle_init_xblock(blk, varargin)
 %% inports
 a = xInport('a');
 b = xInport('b');
+w = xInport('w');
 sync = xInport('sync');
 
 %% outports
@@ -55,6 +56,7 @@ defaults = {'FFTSize', 2, ...
     'use_dsp48_mults', 0, ...
     'opt_target','logic', ...
     'biplex','off'...
+    'twiddle_type', 'twiddle_general_4mult', ...
 };
 
 FFTSize = get_var('FFTSize', 'defaults', defaults, varargin{:});
@@ -83,19 +85,21 @@ overflow = get_var('overflow', 'defaults', defaults, varargin{:});
 opt_target = get_var('opt_target', 'defaults', defaults, varargin{:});
 use_dsp48_mults = get_var('use_dsp48_mults', 'defaults', defaults, varargin{:});
 biplex = get_var('biplex', 'defaults', defaults, varargin{:});
+twiddle_type = get_var('twiddle_type', 'defaults', defaults, varargin{:});
 
 
 %use_embedded = strcmp('on', use_embedded);
 
+% if isempty(ActualCoeffs)
+%     br_indices = bit_rev(Coeffs, FFTSize-1);
+%     br_indices = -2*pi*1j*br_indices/2^FFTSize;
+%     ActualCoeffs = exp(br_indices);
+% end
 
-if isempty(ActualCoeffs)
-    br_indices = bit_rev(Coeffs, FFTSize-1);
-    br_indices = -2*pi*1j*br_indices/2^FFTSize;
-    ActualCoeffs = exp(br_indices);
-end
-
-
-twiddle_type = get_twiddle_type(Coeffs, biplex, opt_target, use_embedded,StepPeriod,FFTSize);
+% twiddle_type = get_twiddle_type(Coeffs, biplex, opt_target, use_embedded,StepPeriod,FFTSize);
+% fprintf('Twiddle thinks twiddle_type is: %s\n', twiddle_type);
+% Coeffs
+% ActualCoeffs
 
 %% Module Drawing
 % convert 'a' input to real/imag
@@ -110,8 +114,7 @@ b_im = xSignal;
 c_to_ri_b = xBlock(struct('source', str2func('c_to_ri_init_xblock'), 'name', 'c_to_ri_b'), ...
     {strcat(blk, '/c_to_ri_b'),input_bit_width, input_bit_width-1}, {b}, {b_re, b_im});
 
-if strcmp(twiddle_type, 'twiddle_pass_through') || strcmp(twiddle_type, 'twiddle_stage_2')...
-        || strcmp(twiddle_type,'twiddle_general_dsp48e') || strcmp(twiddle_type, 'twiddle_coeff_0')
+if ismember(twiddle_type, {'twiddle_pass_through', 'twiddle_stage_2', 'twiddle_general_dsp48e', 'twiddle_coeff_0'})
     % delay inputs by input_latency length
     if input_latency > 0
 		a_re_del = xSignal;
@@ -148,15 +151,20 @@ switch twiddle_type
         bw_im_out.assign(b_im_del);
         sync_out.assign(sync_del);
         
+        % terminate coefficient input
+        xBlock(struct('source', 'simulink/Sinks/Terminator', 'name', 'coeff_term'), ...
+            {}, {w}, {});
+        
     case 'twiddle_stage_2'
         disp('twiddle_stage_2');
-        use_dsp48_mults
-        negate_dsp48e
 		twiddle_stage_2_draw_init_xblock(a_re_del, a_im_del, b_re_del, b_im_del, sync_del, ...
 	    	a_re_out, a_im_out, bw_re_out, bw_im_out, sync_out, ...
 	    	FFTSize, input_bit_width, add_latency, mult_latency, bram_latency, ...
 	    	conv_latency, negate_dsp48e, opt_target, mux_latency, negate_latency);
-	    	
+
+        % terminate coefficient input
+        xBlock(struct('source', 'simulink/Sinks/Terminator', 'name', 'coeff_term'), ...
+            {}, {w}, {});
     case 'twiddle_general_dsp48e'
         disp('twiddle_general_dsp48e');
         twiddle_general_dsp48e_draw_init_xblock(a_re_del, a_im_del, b_re_del, b_im_del, sync_del, ...
@@ -206,7 +214,7 @@ end
 
 if ~isempty(blk) && ~strcmp(blk(1),'/')
     % Delete all unconnected blocks.
-    clean_blocks(blk);
+%     clean_blocks(blk);
 
     %%%%%%%%%%%%%%%%%%%
     % Finish drawing! %

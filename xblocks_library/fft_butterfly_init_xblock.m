@@ -29,7 +29,7 @@ function fft_butterfly_init_xblock(blk, varargin)
 %
 % {'c_to_ri_init_xblock','cmacc_dsp48e_init_xblock','simd_add_dsp48e_init_xblock','coeff_gen_init_xblock'}
 
-defaults = {};
+defaults = {'mux_latency', 1, 'twiddle_type', 'twiddle_general_4mult'};
 % defaults = {'Coeffs', [0 1], ...
 %     'StepPeriod', 0, ...
 %     'input_bit_width', 18, ...
@@ -63,7 +63,7 @@ Coeffs = get_var('Coeffs', 'defaults', defaults, varargin{:});
 StepPeriod = get_var('StepPeriod', 'defaults', defaults, varargin{:});
 input_bit_width = get_var('input_bit_width', 'defaults', defaults, varargin{:});
 coeff_bit_width = get_var('coeff_bit_width', 'defaults', defaults, varargin{:});
-
+twiddle_type = get_var('twiddle_type', 'defaults', defaults, varargin{:});
 add_latency = get_var('add_latency', 'defaults', defaults, varargin{:});
 mult_latency = get_var('mult_latency', 'defaults', defaults, varargin{:});
 bram_latency = get_var('bram_latency', 'defaults', defaults, varargin{:});
@@ -88,10 +88,7 @@ bit_growth = get_var('bit_growth', 'defaults', defaults, varargin{:});
 negate_latency = get_var('negate_latency', 'defaults', defaults, varargin{:});
 negate_dsp48e = get_var('negate_dsp48e', 'defaults', defaults, varargin{:});
 
-
-
 % Validate input fields.
-
 if ~strcmp(arch, 'Virtex5') && strcmp(dsp48_adders, 'on'),
     fprintf('butterfly_direct_init: Cannot use dsp48e adders on a non-Virtex5 chip.\n');
     clog(['butterfly_direct_init: Cannot use dsp48e adders on a non-Virtex5 chip.\n'], 'error');
@@ -113,18 +110,10 @@ if dsp48_adders,
     add_latency = 2;
 end
 
-
-% Compute the complex, bit-reversed values of the twiddle factors
-br_indices = bit_rev(Coeffs, FFTSize-1);
-br_indices = -2*pi*1j*br_indices/2^FFTSize;
-ActualCoeffs = exp(br_indices);
-
-
-
-
 %% inports
 a = xInport('a');
 b = xInport('b');
+w = xInport('w');
 sync = xInport('sync');
 shift = xInport('shift');
 
@@ -135,8 +124,6 @@ of = xOutport('of');
 sync_out = xOutport('sync_out');
 
 %% diagram
-
-
 
 % instantiate twiddle
 a_re = xSignal;
@@ -157,24 +144,24 @@ ambw_re_ds = xSignal;
 ambw_im_ds = xSignal;
 
 
-twiddle_type = get_twiddle_type(Coeffs, biplex, opt_target, use_embedded,StepPeriod,FFTSize);
-gen_twiddles = {'twiddle_general_dsp48e', 'twiddle_general_4mult', 'twiddle_general_3mult'};
-using_gen_twiddle = strcmp(twiddle_type, gen_twiddles);
-five_dsp_butterfly = sum(dsp48_adders & use_embedded & using_gen_twiddle);
+% twiddle_type = get_twiddle_type(Coeffs, biplex, opt_target, use_embedded,StepPeriod,FFTSize);
+% fprintf('Butterfly thinks twiddle type is: %s\n', twiddle_type);
+% gen_twiddles = {'twiddle_general_dsp48e', 'twiddle_general_4mult', 'twiddle_general_3mult'};
+% using_gen_twiddle = strcmp(twiddle_type, gen_twiddles);
+
+% five_dsp_butterfly = sum(dsp48_adders & use_embedded & using_gen_twiddle);
+five_dsp_butterfly = strcmp(twiddle_type, 'twiddle_general_4mult') && strcmp(opt_target, 'multipliers')
 
 % Compute bit widths into addsub and convert blocks.
 bw = input_bit_width + 7;
 bd = input_bit_width + 2;
-if strcmp(twiddle_type, 'twiddle_general_3mult'),
+if ismember(twiddle_type, {'twiddle_general_3mult'})
     bw = input_bit_width + 7;
     bd = input_bit_width + 2;
-elseif strcmp(twiddle_type, 'twiddle_general_4mult') || strcmp(twiddle_type, 'twiddle_general_dsp48e'),
+elseif ismember(twiddle_type, {'twiddle_general_4mult', 'twiddle_general_dsp48e'})
     bw = input_bit_width + 6;
     bd = input_bit_width + 2;
-elseif strcmp(twiddle_type, 'twiddle_stage_2') ...
-    || strcmp(twiddle_type, 'twiddle_coeff_0') ...
-    || strcmp(twiddle_type, 'twiddle_coeff_1') ...
-    || strcmp(twiddle_type, 'twiddle_pass_through'),
+elseif ismember(twiddle_type, {'twiddle_stage_2', 'twiddle_coeff_0', 'twiddle_coeff_1', 'twiddle_pass_through'})
     bw = input_bit_width + 2;
     bd = input_bit_width;
 else
@@ -200,32 +187,32 @@ end
 
 if five_dsp_butterfly
 	arith = xBlock( struct('source', str2func('butterfly_arith_dsp48e_init_xblock'), 'name', 'arith'), ...
-					{[blk,'/arith'], Coeffs, StepPeriod, coeff_bit_width, input_bit_width, bram_latency,...
-				    conv_latency, quantization, overflow, arch, coeffs_bram, FFTSize}, ...
-				    {a, b, sync}, ...
+					{[blk,'/arith'], 'coeff_bit_width', 18, 'coeff_bin_pt', 17, 'input_bit_width', 18, ...
+                     'conv_latency', conv_latency, 'quantization', quantization, 'overflow', overflow}, ...
+				    {a, b, w, sync}, ...
 				    {apbw_re, apbw_im, ambw_re, ambw_im, twiddle_sync_out} );
-	sync_latency = conv_latency;
-				    
+	sync_latency = conv_latency;			    
 else 
-	sync_latency = add_latency + conv_latency; 
+	sync_latency = add_latency + conv_latency;
 	twiddle = xBlock(struct('source', str2func('fft_twiddle_init_xblock'), 'name', 'twiddle'), ...
-									{[blk,'/twiddle'], {varargin{:},'ActualCoeffs',ActualCoeffs}}, ...
-									{a, b, sync}, ...
+									{[blk,'/twiddle'], varargin{:}, 'twiddle_type', twiddle_type}, ...
+									{a, b, w, sync}, ...
 									{a_re, a_im, bw_re, bw_im, twiddle_sync_out});
 	if dsp48_adders
 		cadd = xBlock(struct('source', str2func('simd_add_dsp48e_init_xblock'), 'name', 'cadd'), ...
-						  {[blk,'/cadd'], 'Addition', input_bit_width, input_bit_width-1, input_bit_width + 4, ...
-								input_bit_width + 1, 'on', 19, 17, 'Truncate', 'Wrap', 0}, ...
+						  {[blk,'/cadd'], 'mode', 'Addition', 'n_bits_a', input_bit_width, ...
+                           'bin_pt_a', input_bit_width-1, 'n_bits_b', input_bit_width + 4, ...
+							'bin_pt_b', input_bit_width + 1, 'full_precision', 1}, ...
 						  {a_re, a_im, bw_re, bw_im}, ...
 						  {apbw_re, apbw_im});
 		
 		csub = xBlock(struct('source', str2func('simd_add_dsp48e_init_xblock'), 'name', 'csub'), ...
-						  {[blk,'/csub'],'Subtraction', input_bit_width, input_bit_width-1, input_bit_width + 4, ...
-								input_bit_width + 1, 'on', 19, 17, 'Truncate', 'Wrap', 0}, ...
+						  {[blk,'/csub'], 'mode', 'Subtraction', 'n_bits_a', input_bit_width, ...
+                           'bin_pt_a', input_bit_width-1, 'n_bits_b', input_bit_width + 4, ...
+							'bin_pt_b', input_bit_width + 1, 'full_precision', 1}, ...
 						  {a_re, a_im, bw_re, bw_im}, ...
 						  {ambw_re, ambw_im});
-	else
-		% TODO! 
+    else
         AddSub = cell(1,4);
         
         AddSub{1} = xBlock(struct('source', 'AddSub', 'name', 'AddSub0'), ...
@@ -258,9 +245,7 @@ else
                                   'use_behavioral_HDL', 'on'), ...
                            {a_im,bw_im}, ...
                            {ambw_im});
-
-	end
-
+    end
 end                  
 
 
@@ -284,13 +269,13 @@ for k = 1:4
 	% downshift output signal
 	sig_ds = xSignal;
 	sig_var_ds = xSignal;	
-
+    
 	if ~strcmp(hardcode_shifts, 'on')  
 		xBlock( struct('source', 'Scale', 'name', ['scale_', num2str(k)]), ...
 				struct('scale_factor', -1), {sig}, {sig_ds} );
 		% multiplex downshifted signal with direct output
 		xBlock(struct('source', 'Mux', 'name', ['mux_', num2str(k)]), ...
-					 struct('latency', 1), {shift_del, sig, sig_ds}, {sig_var_ds});
+					 struct('latency', mux_latency), {shift_del, sig, sig_ds}, {sig_var_ds});
 
 		% determine bit widths going into convert block
 		%conv_input_bit_width = input_bit_width + 6;
@@ -311,13 +296,11 @@ for k = 1:4
 	% convert signals to specified output type
 	conv_sig = xSignal;
 	conv_sig_of = xSignal;
-	if (k <= 2) & five_dsp_butterfly
+	if (k <= 2) && five_dsp_butterfly
 		convert_of_latency = conv_latency + 2;
 	else
 		convert_of_latency = conv_latency;
-	end
-	
-
+    end
 	
 	%convert_of1_sub = xBlock(struct('source', str2func('convert_of_init_xblock'), 'name', ['conv_of_', num2str(k)]), ...
 	%							{conv_input_bit_width, conv_input_bin_pt, input_bit_width+bit_growth, input_bit_width-1+bit_growth, ...
@@ -331,28 +314,27 @@ for k = 1:4
 	of_sigs{k} = conv_sig_of;
 end
 
-% OR the overflow signals together
+% 'or' the overflow signals together
 xBlock(struct('source', 'Logical', 'name', 'Logical'), ...
 	struct('logical_function', 'OR', 'inputs', 4), of_sigs, {of} );
 	
-	
 % combine data signals into complex outputs
 xBlock(struct('source', str2func('ri_to_c_init_xblock'), 'name', 'ri_to_c01'), ...
-		  {}, { conv_sigs{1}, conv_sigs{2} }, {apbw});
+    {}, { conv_sigs{1}, conv_sigs{2} }, {apbw});
 xBlock(struct('source', str2func('ri_to_c_init_xblock'), 'name', 'ri_to_c23'), ...
-		  {}, { conv_sigs{3}, conv_sigs{4} }, {ambw});
+    {}, { conv_sigs{3}, conv_sigs{4} }, {ambw});
 
 % delay sync from twiddle
-if ~strcmp(hardcode_shifts, 'on') 
+if strcmp(hardcode_shifts, 'off')
 	sync_latency = sync_latency + 1;
 end
 
 sync_delay = xBlock(struct('source', 'Delay', 'name', 'sync_delay'), ...
-                           struct('latency', sync_latency, 'reg_retiming', 'on'), {twiddle_sync_out}, {sync_out});
+    struct('latency', sync_latency, 'reg_retiming', 'on'), {twiddle_sync_out}, {sync_out});
 
 if ~isempty(blk) && ~strcmp(blk(1), '/')
     % Delete all unconnected blocks.
-    clean_blocks(blk);
+%     clean_blocks(blk);
 
     %%%%%%%%%%%%%%%%%%%
     % Finish drawing! %

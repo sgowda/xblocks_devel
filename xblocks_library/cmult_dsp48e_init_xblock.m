@@ -20,7 +20,11 @@
 %                                                                             %
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 function cmult_dsp48e_init_xblock(blk, n_bits_a, bin_pt_a, n_bits_b, bin_pt_b, conjugated, ...
-	full_precision, n_bits_c, bin_pt_c, quantization, overflow, cast_latency)
+	full_precision, n_bits_c, bin_pt_c, quantization, overflow, cast_latency, varargin)
+
+
+defaults = {'cplx_inputs', 0};
+cplx_inputs = get_var('cplx_inputs', 'defaults', defaults, varargin{:});
 
 % Validate input fields.
 % Initialization script
@@ -102,16 +106,39 @@ else
 end
 
 
-%% inports
-a_re = xInport('a_re');
-a_im = xInport('a_im');
-b_re = xInport('b_re');
-b_im = xInport('b_im');
+%-- inports and outports
+if cplx_inputs
+    a = xInport('a');
+    b = xInport('b');
+    c = xOutport('c');
+    
+    a_re = xSignal('a_re');
+    a_im = xSignal('a_im');
+    b_re = xSignal('b_re');
+    b_im = xSignal('b_im');
 
-%% outports
-c_re = xOutport('c_re');
-c_im = xOutport('c_im');
+    xBlock(struct('name', 'a_input_c_to_ri', 'source', str2func('c_to_ri_init_xblock')), ...
+        {sprintf('%s/%s', blk, 'a_input_c_to_ri'), n_bits_a, bin_pt_a}, ...
+        {a}, {a_re, a_im});
 
+    xBlock(struct('name', 'b_input_c_to_ri', 'source', str2func('c_to_ri_init_xblock')), ...
+        {sprintf('%s/%s', blk, 'b_input_c_to_ri'), n_bits_b, bin_pt_b}, ...
+        {b}, {b_re, b_im});
+    
+    c_re = xSignal('c_re');
+    c_im = xSignal('c_im');
+    
+    xBlock(struct('name', 'c_output_ri_to_c', 'source', str2func('ri_to_c_init_xblock')), ...
+        {sprintf('%s/%s', blk, 'c_output_ri_to_c')}, {c_re, c_im}, {c});
+else
+    a_re = xInport('a_re');
+    a_im = xInport('a_im');
+    b_re = xInport('b_re');
+    b_im = xInport('b_im');
+
+    c_re = xOutport('c_re');
+    c_im = xOutport('c_im');
+end
 %% diagram
 % block: twiddle_dsp48e_test/twiddle_general_dsp48e/cmult/Convert
 reinterp_a_im_out1 = xSignal;
