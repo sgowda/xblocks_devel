@@ -114,6 +114,12 @@ b_im = xSignal;
 c_to_ri_b = xBlock(struct('source', str2func('c_to_ri_init_xblock'), 'name', 'c_to_ri_b'), ...
     {strcat(blk, '/c_to_ri_b'),input_bit_width, input_bit_width-1}, {b}, {b_re, b_im});
 
+% convert 'w' input to real/imag
+w_re = xSignal;
+w_im = xSignal;
+c_to_ri_w = xBlock(struct('source', str2func('c_to_ri_init_xblock'), 'name', 'c_to_ri_w'), ...
+    {strcat(blk, '/c_to_ri_w'),input_bit_width, input_bit_width-1}, {w}, {w_re, w_im});
+
 if ismember(twiddle_type, {'twiddle_pass_through', 'twiddle_stage_2', 'twiddle_general_dsp48e', 'twiddle_coeff_0'})
     % delay inputs by input_latency length
     if input_latency > 0
@@ -185,16 +191,23 @@ switch twiddle_type
                             struct('latency', total_latency), {b_im_del}, {bw_im_out} );
         sync_delay2 = xBlock(struct('source', 'Delay', 'name', 'sync_del'), ...
                             struct('latency', total_latency), {sync_del}, {sync_out} );
-                            
+        % terminate coefficient input
+        xBlock(struct('source', 'simulink/Sinks/Terminator', 'name', 'coeff_term'), ...
+            {}, {w}, {});
+        
     case 'twiddle_coeff_1'
         disp('twiddle_coeff_1');
         twiddle_coeff_1_draw_init_xblock(a_re, a_im, b_re, b_im, sync, ...
             a_re_out, a_im_out, bw_re_out, bw_im_out, sync_out, ...
             FFTSize, input_bit_width, negate_latency);
-            
+        
+        % terminate coefficient input
+        xBlock(struct('source', 'simulink/Sinks/Terminator', 'name', 'coeff_term'), ...
+            {}, {w}, {});
+        
     case 'twiddle_general_4mult' 
         disp('twiddle_general_4mult');
-		twiddle_general_4mult_draw_init_xblock(a_re, a_im, b_re, b_im, sync, ...
+		twiddle_general_4mult_draw_init_xblock(a_re, a_im, b_re, b_im, w_re, w_im, sync, ...
 			a_re_out, a_im_out, bw_re_out, bw_im_out, sync_out, ...
 			ActualCoeffs, StepPeriod, coeffs_bram, coeff_bit_width, input_bit_width, ...
 			add_latency, mult_latency, bram_latency, conv_latency, arch, use_hdl, ... 

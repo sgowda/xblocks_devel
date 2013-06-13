@@ -34,16 +34,17 @@ defaults = { ...
     'mult_latency', 3, ...
     'bram_latency', 2, ...
     'conv_latency', 1, ...
+    'negate_latency', 3, ...
     'quantization', 'Round  (unbiased: +/- Inf)', ...
     'overflow', 'Saturate', ...
     'arch', 'Virtex5', ...
-    'opt_target', 'multipliers', ...
+    'opt_target', 'logic', ...
     'coeffs_bit_limit', 8,  ...
     'specify_mult', 'on', ...
     'mult_spec', [1,1], ...
     'hardcode_shifts', 'off', ...
     'shift_schedule', [1], ...
-    'dsp48_adders', 'on', ...
+    'dsp48_adders', 'off', ...
     'bit_growth_chart', [0 0], ...
 };
 
@@ -61,6 +62,7 @@ add_latency = get_var('add_latency', 'defaults', defaults, varargin{:});
 mult_latency = get_var('mult_latency', 'defaults', defaults, varargin{:});
 bram_latency = get_var('bram_latency', 'defaults', defaults, varargin{:});
 conv_latency = get_var('conv_latency', 'defaults', defaults, varargin{:});
+negate_latency = get_var('negate_latency', 'defaults', defaults, varargin{:});
 quantization = get_var('quantization', 'defaults', defaults, varargin{:});
 overflow = get_var('overflow', 'defaults', defaults, varargin{:});
 arch = get_var('arch', 'defaults', defaults, varargin{:});
@@ -129,12 +131,9 @@ if map_tail
         {sync, data_inports{1:n_inputs}}, {fft_sync, direct_form_inputs{:}});
 else
     fft_sync = sync;
-    direct_form_inputs = data_inports{1:n_inputs};
+    direct_form_inputs = data_inports;
+    size(data_inports)
 end
-
-% Add nodes
-node_inputs = cell(FFTSize+1, n_inputs);
-node_outputs = cell(FFTSize+1, n_inputs);
 
 bf_shifts = {};
 for stage=0:FFTSize,
@@ -179,13 +178,11 @@ for k=1:n_inputs
     bf_syncs{k, 1} = fft_sync;
 end
 
-
 stage_of_out = {};
-
-
 
 % Add butterflies
 node_outputs = direct_form_inputs;
+
 for stage=1:FFTSize,
     use_hdl = 'on';
     use_embedded = 'off';
@@ -213,8 +210,28 @@ for stage=1:FFTSize,
     bf_input_pairs = cornerturn(1:n_inputs, stage);
     node_outputs_temp = xblock_new_bus(n_inputs, 1);
 
+    FFTStage = stage;
+    if(FFTStage == 1 ),
+        Coeffs = 0;
+    else
+        Coeffs = 0:2^(FFTStage-1)-1;
+    end
+    StepPeriod = FFTSize-FFTStage;
+
+    % Compute the complex, bit-reversed values of the twiddle factors
+    br_indices = bit_rev(Coeffs, FFTSize-1);
+    br_indices = -2*pi*1j*br_indices/2^FFTSize;
+    ActualCoeffs = exp(br_indices);    
+    
+    w = [];
+    for k=1:length(ActualCoeffs)
+        w = [w, repmat(ActualCoeffs(k), 1, 2^StepPeriod)];
+    end
+    
+
+
     for i=0:n_inputs/2-1,
-        bf_name = sprintf('butterfly%d_%d', stage, i)
+        bf_name = sprintf('butterfly%d_%d', stage, i);
 %         if strcmp(map_tail, 'off'), % Implement a normal FFT
 %             coeffs = [ floor(i/2^(FFTSize-stage)) ];
 %             actual_fft_size = FFTSize;
@@ -234,29 +251,49 @@ for stage=1:FFTSize,
 %         node_one_num = 2^(FFTSize-stage+1)*floor(i/2^(FFTSize-stage)) + mod(i, 2^(FFTSize-stage))
 %         node_two_num = node_one_num+2^(FFTSize-stage)
         
-        
+        % Assign twiddle type
+        if stage == 1
+            twiddle_type = 'twiddle_pass_through';
+            output_latency = 0;
+        elseif (stage == 2) && (i < n_inputs/4)
+            twiddle_type = 'twiddle_pass_through';
+            output_latency = negate_latency;
+        elseif stage == 2
+            twiddle_type = 'twiddle_coeff_1';
+            output_latency = 0;
+        else
+            twiddle_type = 'twiddle_general_4mult';
+            output_latency = 0;
+        end
+        % twiddle_type = 'twiddle_general_4mult';
+
+
+
         % butterfly constant coefficient
         bf_coef = xSignal();
-        coef_ind = floor(i/2^(FFTSize-stage));
+%         coef_ind = floor(i/2^(FFTSize-stage));
         xBlock(struct('name', sprintf('%s_coef', bf_name), 'source', 'complex_constant_init_xblock'), ...
             {subblockname(blk, sprintf('%s_coef', bf_name)), 'bit_width', coeff_bit_width, ...
-             'bin_pt', coeff_bin_pt, 'value', exp(-1j*2*pi*coef_ind)}, {}, {bf_coef});
-        
-        % cell array of butterfly output signals
-        input_pair = bf_input_pairs(:,i+1);
-        bf_inputs = { node_outputs{input_pair(1), 1}, node_outputs{input_pair(2), 1}, ...
-            bf_coef, bf_syncs{i+1, stage}, bf_shifts{stage} };
+             'bin_pt', coeff_bin_pt, 'value', w(i+1)}, {}, {bf_coef});
         
         % cell array of butterfly input signals
+        input_pair = bf_input_pairs(:,i+1);
+        bf_inputs = { node_outputs{input_pair(1)}, node_outputs{input_pair(2)}, ...
+            bf_coef, bf_syncs{i+1, stage}, bf_shifts{stage} };
+        
+        % cell array of butterfly output signals
         of_out = xSignal();
-        bf_outputs = {node_outputs_temp{2*i+1,1}, node_outputs_temp{2*i+2,1}, ...
-        	of_out, bf_syncs{i+1, stage+1} };        
-
-%         bf_inputs = {}; bf_outputs = {};
+        if (stage == FFTSize) && (i == 0)
+            bf_sync_out = sync_out;
+        else
+            bf_sync_out = bf_syncs{i+1, stage+1};
+        end
+        bf_outputs = {node_outputs_temp{input_pair(1),1}, node_outputs_temp{input_pair(2),1}, ...
+        	of_out, bf_sync_out };        
         fprintf('%s\n', bf_name);
         xBlock( struct('source', str2func('fft_butterfly_init_xblock'), 'name', bf_name), ...
             {[blk,'/',bf_name], 'biplex', 'off', ...
-            'twiddle_type', 'twiddle_general_4mult', ...
+            'twiddle_type', twiddle_type, ...
             'coeff_bit_width', coeff_bit_width, ...
             'input_bit_width', input_bit_width, ...
             'downshift', downshift, ...
@@ -272,9 +309,10 @@ for stage=1:FFTSize,
             'use_embedded', use_embedded, ...
             'hardcode_shifts', hardcode_shifts, ...
             'dsp48_adders', dsp48_adders, ...
-            'bit_growth', bit_growth_chart(stage), 'Position', bf_pos}, ...
+            'output_latency', output_latency, ...
+            'bit_growth', bit_growth_chart(stage)}, ...
             bf_inputs, bf_outputs );
-
+%         set_param([blk,'/',bf_name], 'Position', 'bf_pos');
 		stage_of_outputs{i+1} = of_out;
     end
 	coeff_bit_width = coeff_bit_width + bit_growth_chart(stage);
@@ -307,8 +345,9 @@ else
 end
 
 % Connect sync_out
-sync_out.bind( bf_syncs{FFTSize+1, 1} );
+% sync_out.bind( bf_syncs{FFTSize+1, stage} );
 
+% Bit-reverse the output ports
 output_inds = bit_rev(0:n_inputs-1, FFTSize);
 for k=0:n_inputs-1
     data_outports{k+1}.bind(node_outputs{output_inds(k+1)+1, 1});

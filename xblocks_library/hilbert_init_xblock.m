@@ -158,8 +158,7 @@ xlsub2_c_to_ri_sub = xBlock(struct('source', str2func('c_to_ri_init_xblock'), 'n
                         {xlsub2_c_to_ri_out1, xlsub2_c_to_ri_out2});
 
 annotation=sprintf('%d_%d r/i',BitWidth,BitWidth-1);
-gcb
-set_param(gcb,'AttributesFormatString',annotation);
+set_param(blk,'AttributesFormatString',annotation);
 
 % block: xblocks_library_ffts_internal/hilbert/c_to_ri1
 xlsub2_c_to_ri1_sub = xBlock(struct('source', str2func('c_to_ri_init_xblock'), 'name', 'c_to_ri1'), ...
@@ -167,10 +166,6 @@ xlsub2_c_to_ri1_sub = xBlock(struct('source', str2func('c_to_ri_init_xblock'), '
                          {xlsub2_b}, ...
                          {xlsub2_c_to_ri1_out1, xlsub2_c_to_ri1_out2});
                      
-
-annotation=sprintf('%d_%d r/i',BitWidth,BitWidth-1);
-gcb
-set_param(gcb,'AttributesFormatString',annotation);
 
 % block: xblocks_library_ffts_internal/hilbert/ri_to_c
 xlsub2_ri_to_c_sub = xBlock(struct('source', str2func('ri_to_c_init_xblock'), 'name', 'ri_to_c'), ...
@@ -189,6 +184,8 @@ xlsub2_ri_to_c1_sub = xBlock(struct('source', str2func('ri_to_c_init_xblock'), '
 
 if ~isempty(blk) && ~strcmp(blk(1), '/')
     clean_blocks(blk);
+    annotation=sprintf('%d_%d r/i',BitWidth,BitWidth-1);
+    set_param(blk,'AttributesFormatString',annotation);    
 end
 
 
