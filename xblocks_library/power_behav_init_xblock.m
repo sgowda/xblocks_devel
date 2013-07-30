@@ -1,4 +1,10 @@
-function power_behav_init_xblock(BitWidth, add_latency, mult_latency)
+function power_behav_init_xblock(blk, varargin)
+defaults = {'bit_width', 18, 'bin_pt', 17, 'add_latency', 2, 'mult_latency', 3};
+bit_width = get_var('bit_width', 'defaults', defaults, varargin{:});
+bin_pt = get_var('bin_pt', 'defaults', defaults, varargin{:});
+add_latency = get_var('add_latency', 'defaults', defaults, varargin{:});
+mult_latency = get_var('mult_latency', 'defaults', defaults, varargin{:});
+
 %% inports
 c = xInport('c');
 
@@ -11,8 +17,8 @@ power = xOutport('power');
 c_to_ri_out1 = xSignal;
 c_to_ri_out2 = xSignal;
 c_to_ri = xBlock(struct('source', 'casper_library_misc/c_to_ri', 'name', 'c_to_ri'), ...
-                        struct('n_bits', BitWidth, ...
-                               'bin_pt', BitWidth-1), ...
+                        struct('n_bits', bit_width, ...
+                               'bin_pt', bin_pt), ...
                         {c}, ...
                         {c_to_ri_out1, c_to_ri_out2});
 
