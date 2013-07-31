@@ -1,0 +1,9 @@
+function [x_rounded] = trunc_and_wrap(name, x, n_bits, bin_pt)
+% Truncation rounding with wrapping
+x_rounded = xSignal();
+config.source = 'Convert';
+config.name = name;
+xlsub3_Convert = xBlock(config, ...
+    struct('n_bits', n_bits, 'bin_pt', bin_pt, 'quantization', 'Truncate', 'overflow', 'Wrap', 'latency', 0), ...
+    {x}, ...
+    {x_rounded});
