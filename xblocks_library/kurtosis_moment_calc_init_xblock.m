@@ -79,7 +79,7 @@ outport8 = xOutport('|m_x|^4');
 square_cplx1_out1 = xSignal('square_cplx1_out1');
 square_cplx1_out2 = xSignal('square_cplx1_out2');
 square_real1_out1 = xSignal('square_real1_out1');
-Mult4_out1 = xSignal('Mult4_out1');
+% Mult4_out1 = xSignal('Mult4_out1');
 cmult_conj2_out1 = xSignal('cmult_conj2_out1');
 cmult_conj1_out1 = xSignal('cmult_conj1_out1');
 
@@ -87,32 +87,21 @@ cmult_conj1_out1 = xSignal('cmult_conj1_out1');
 Convert_out1 = trunc_and_wrap('Convert', square_cplx1_out1, 25, 22);
 Convert1_out1 = trunc_and_wrap('Convert1', square_cplx1_out2, 25, 22);
 Scale4_out1 = scale('Scale4', square_real1_out1, 2);
-%Scale4_out1_rounded = 
 outport2.bind(round_inf_and_saturate('Convert3', Scale4_out1, 94, 70, 'latency', 4));
-%outport2.bind(Scale4_out1_rounded)
-
-% block: untitled/kurtosis_moment_calc_init_xblock/kurtosis_cross_products/Convert4
 outport8.bind(round_inf_and_saturate('Convert4', square_real1_out1, 94, 70, 'latency', 4));
-%outport8.bind(square_real1_out1_rounded)
 
 m_x = ri_to_c('ri_to_c_mx', m_x_re, m_x_im);
 abs_m_x_sq = modulus_sq('abs_mx_sq', m_x, 'bit_width', 25, 'bin_pt', 24);
 abs_m_x_sq_rounded = trunc_and_wrap('Convert5', abs_m_x_sq, 25, 22);
 
-% block: untitled/kurtosis_moment_calc_init_xblock/kurtosis_cross_products/Mult4
 del1_out1 = delay_srl('del1', inport1, 5);
-Mult4 = xBlock(struct('source', 'Mult', 'name', 'Mult4'), ...
-    struct('latency', 5), ...
-    {abs_m_x_sq_rounded, del1_out1}, ...
-    {Mult4_out1});
-
-% block: untitled/kurtosis_moment_calc_init_xblock/kurtosis_cross_products/Scale
+% Mult4 = xBlock(struct('source', 'Mult', 'name', 'Mult4'), ...
+%     struct('latency', 5), ...
+%     {abs_m_x_sq_rounded, del1_out1}, ...
+%     {Mult4_out1});
+Mult4_out1 = mult('Mult4', abs_m_x_sq_rounded, del1_out1, 'latency', 5);
 Scale_out1 = scale('Scale', cmult_conj2_out1, 2);
-
-% block: untitled/kurtosis_moment_calc_init_xblock/kurtosis_cross_products/Scale1
 outport4.bind(scale('Scale1', cmult_conj1_out1, 1));
-
-% block: untitled/kurtosis_moment_calc_init_xblock/kurtosis_cross_products/Scale3
 Scale3_out1 = scale('Scale3', Mult4_out1, 2);
 
 delay_sq1_out1 = delay_srl('delay_sq1', inport7, 6);
