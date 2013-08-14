@@ -48,7 +48,6 @@ defaults = { ...
     'bit_growth_chart', [0 0], ...
 };
 
-
 % Retrieve values from mask fields.
 FFTSize = get_var('FFTSize', 'defaults', defaults, varargin{:});
 input_bit_width = get_var('input_bit_width', 'defaults', defaults, varargin{:});
@@ -288,7 +287,7 @@ for stage=1:FFTSize,
         else
             bf_sync_out = bf_syncs{i+1, stage+1};
         end
-        bf_outputs = {node_outputs_temp{input_pair(1),1}, node_outputs_temp{input_pair(2),1}, ...
+        bf_outputs = {node_outputs_temp{input_pair(1)}, node_outputs_temp{input_pair(2)}, ...
         	of_out, bf_sync_out };        
         fprintf('%s\n', bf_name);
         xBlock( struct('source', str2func('fft_butterfly_init_xblock'), 'name', bf_name), ...
@@ -350,7 +349,7 @@ end
 % Bit-reverse the output ports
 output_inds = bit_rev(0:n_inputs-1, FFTSize);
 for k=0:n_inputs-1
-    data_outports{k+1}.bind(node_outputs{output_inds(k+1)+1, 1});
+    data_outports{k+1}.bind(node_outputs{output_inds(k+1)+1});
 end
 
 % if ~isempty(blk) && ~strcmp(blk(1),'/')
