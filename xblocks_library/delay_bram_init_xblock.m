@@ -20,8 +20,7 @@
 %                                                                             %
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 function delay_bram_init_xblock(blk, varargin)
-defaults = { ...
-    'n_inputs', 1, ...
+defaults = { 'n_inputs', 1, ...
     'bram_latency', 4, ...
     'count_using_dsp48', 0};
 
@@ -51,20 +50,11 @@ din = xblock_new_inputs('din', n_inputs, 1);
 dout = xblock_new_outputs('dout', n_inputs, 1);
 
 %% diagram
+we = bool_one('we');
 
-% block: delay_7/delay_bram/Constant2
-we_ufix = const('write_enable', 1, fi_dtype(0, 1, 0));
-we = bool('we_bool', we_ufix);
-
-% we = xSignal;
-% Constant2 = xBlock(struct('source', 'Constant', 'name', 'Constant2'), ...
-%     struct('arith_type', 'Boolean', ...
-%     'n_bits', 1, 'bin_pt', 0, 'explicit_period', 'on'), ...
-%     {}, {we});
-
-% block: delay_7/delay_bram/Counter
-addr = xSignal;
+%-- instantiate counter
 if latency > (bram_latency + 1)
+    addr = xSignal;
     if(bit_width<9)
         Counter = xBlock(struct('source', 'Counter', 'name', 'Counter'), ...
             struct('cnt_type', 'Count Limited', ...
@@ -83,24 +73,19 @@ if latency > (bram_latency + 1)
             'cheap_counter', 0), ...
             {}, ...
             {addr});
-        
     end
-else % address becomes a constant --> should be using a register, not a BRAM
-    Constant1 = xBlock(struct('source', 'Constant', 'name', 'Constant1'), ...
-        struct('const',0, ...
-        'n_bits', bit_width, ...
-        'bin_pt', 0, ...
-        'explicit_period', 'on'), ...
-        {}, ...
-        {addr});
+else % latency == bram_latency + 1, since any less latency throws an error
+    warning('Using BRAM with constant address, switch to register!')
+    addr = const('Constant1', 0, fi_dtype(0, bit_width, 0));
 end
 
+bram_config.source = 'Single Port RAM';
+bram_params = struct('depth', 2^bit_width, 'initVector', 0, 'write_mode', 'Read Before Write', ...
+    'latency', bram_latency);
+    
 for k = 1:n_inputs
-    bram_config.source = 'Single Port RAM';
     bram_config.name = ['bram', num2str(k)];
-    bram_params = struct('depth', 2^bit_width, 'initVector', 0, 'write_mode', 'Read Before Write', ...
-        'latency', bram_latency);
-    single_port_bram = xBlock(bram_config, bram_params, {addr, din{k,1}, we}, {dout{k,1}});
+    xBlock(bram_config, bram_params, {addr, din{k,1}, we}, dout(k,1));
 end
 
 end
