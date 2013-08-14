@@ -97,7 +97,6 @@ sync_out = xOutport('sync_out');
 n_inputs = 2^FFTSize;
 stream_fft_size = 2^(StartStage - 1);
 
-
 data_inports = {};
 data_outports = {};
 for k=0:2^FFTSize-1,
@@ -136,26 +135,6 @@ end
 
 bf_shifts = {};
 for stage=0:FFTSize,
-%     for i=0:2^FFTSize-1,
-%         node_name = ['node',num2str(stage),'_',num2str(i)];
-%         pos = [300*stage+90 100*i+100 300*stage+120 100*i+130];
-%         
-%         node_in = xSignal;
-%         node_out = xSignal;
-%         if stage == 0
-% 			xBlock( struct('source', 'Delay', 'name', node_name), struct('latency', 0, 'Position', pos), ...
-% 					{direct_form_inputs{i+1}}, {node_out});        	
-%         elseif stage == FFTSize
-% 			xBlock( struct('source', 'Delay', 'name', node_name), struct('latency', 0, 'Position', pos), ...
-% 					{node_in}, {data_outports{bit_reverse(i, FFTSize)+1}});
-%         else
-% 			xBlock( struct('source', 'Delay', 'name', node_name), struct('latency', 0, 'Position', pos), ...
-% 					{node_in}, {node_out});
-% 		end
-%         node_inputs{stage+1, i+1} = node_in;
-%         node_outputs{stage+1, i+1} = node_out;
-%     end
-% 
 	% slice off shift bits for each butterfly 
     if (stage ~= FFTSize),
     	stage_shift = xSignal;
@@ -226,29 +205,10 @@ for stage=1:FFTSize,
     for k=1:length(ActualCoeffs)
         w = [w, repmat(ActualCoeffs(k), 1, 2^StepPeriod)];
     end
-    
-
 
     for i=0:n_inputs/2-1,
         bf_name = sprintf('butterfly%d_%d', stage, i);
-%         if strcmp(map_tail, 'off'), % Implement a normal FFT
-%             coeffs = [ floor(i/2^(FFTSize-stage)) ];
-%             actual_fft_size = FFTSize;
-%             num_coeffs = 1;
-%         else % Implement the tail end of a larger FFT
-%             
-%             coeffs = [];
-%             for r=0:redundancy-1,
-%                 n = bit_reverse(r, LargerFFTSize - FFTSize);
-%                 coeffs = [coeffs, floor((i+n*2^(FFTSize-1))/2^(LargerFFTSize-(StartStage+stage-1)))];
-%             end
-%             actual_fft_size = LargerFFTSize;
-%             num_coeffs = redundancy;
-%         end
-        
         bf_pos = [300*(stage-1)+220, 200*i+100, 300*(stage-1)+300, 200*i+175];
-%         node_one_num = 2^(FFTSize-stage+1)*floor(i/2^(FFTSize-stage)) + mod(i, 2^(FFTSize-stage))
-%         node_two_num = node_one_num+2^(FFTSize-stage)
         
         % Assign twiddle type
         if stage == 1
@@ -264,13 +224,9 @@ for stage=1:FFTSize,
             twiddle_type = 'twiddle_general_4mult';
             output_latency = 0;
         end
-        % twiddle_type = 'twiddle_general_4mult';
-
-
 
         % butterfly constant coefficient
         bf_coef = xSignal();
-%         coef_ind = floor(i/2^(FFTSize-stage));
         xBlock(struct('name', sprintf('%s_coef', bf_name), 'source', 'complex_constant_init_xblock'), ...
             {subblockname(blk, sprintf('%s_coef', bf_name)), 'bit_width', coeff_bit_width, ...
              'bin_pt', coeff_bin_pt, 'value', w(i+1)}, {}, {bf_coef});
@@ -311,12 +267,10 @@ for stage=1:FFTSize,
             'output_latency', output_latency, ...
             'bit_growth', bit_growth_chart(stage)}, ...
             bf_inputs, bf_outputs );
-%         set_param([blk,'/',bf_name], 'Position', 'bf_pos');
 		stage_of_outputs{i+1} = of_out;
     end
 	coeff_bit_width = coeff_bit_width + bit_growth_chart(stage);
 	input_bit_width = input_bit_width + bit_growth_chart(stage);
-
 
 	%add overflow logic
     %FFTSize == 1 implies 1 input or block which generates an error
@@ -351,12 +305,5 @@ output_inds = bit_rev(0:n_inputs-1, FFTSize);
 for k=0:n_inputs-1
     data_outports{k+1}.bind(node_outputs{output_inds(k+1)+1});
 end
-
-% if ~isempty(blk) && ~strcmp(blk(1),'/')
-%     clean_blocks(blk);
-%     fmtstr = sprintf('%s\nstages [%s] of %d\n[%d,%d]\n%s\n%s\n%s', arch, num2str([StartStage:1:StartStage+FFTSize-1]), ...
-%         actual_fft_size,  input_bit_width, coeff_bit_width, quantization, overflow,num2str(bit_growth_chart,'%d '));
-%     set_param(blk, 'AttributesFormatString', fmtstr);
-% end
 
 end
