@@ -1,145 +1,201 @@
 function kurtosis_moment_calc_init_xblock(blk, varargin)
+defaults = {'acc_len', 14};
+acc_len = get_var('acc_len', 'defaults', defaults, varargin{:});
+
 %% inports
 sync = xInport('sync');
-inport6 = xInport('Re{E[X]}');
-inport3 = xInport('Im{E[X]}');
-inport7 = xInport('Re{E[X^2]}');
-inport4 = xInport('Im{E[X^2]}');
-inport1 = xInport('E[|X|^2]');
-inport2 = xInport('E[||X||^4]');
-inport8 = xInport('Re{E[|X|^2X]}');
-inport5 = xInport('Im{E[|X|^2X]}');
+channel_in = xInport('channel_in');
+m_x_re = xInport('Re{E[X]}');
+m_x_im = xInport('Im{E[X]}');
+X_sq_acc_re = xInport('Re{E[X^2]}');
+X_sq_acc_im = xInport('Im{E[X^2]}');
+abs_X_sq_acc = xInport('E[|X|^2]');
+abs_X_4th_acc = xInport('E[||X||^4]');
+X_3rd_acc_re = xInport('Re{E[|X|^2X]}');
+X_3rd_acc_im = xInport('Im{E[|X|^2X]}');
 
 %% outports
 sync_out = xOutport('sync_out');
-outport2 = xOutport('E[|X-m_x|^4]');
-outport1 = xOutport('E[|X-m_x|^2]^2');
+channel_out = xOutport('channel');
+num = xOutport('num');
+den = xOutport('den');
+abs_X_sq_mean = xOutport('power');
 
 %% diagram
+add_latency_96bit = 4;
+cross_product_latency = 15;
+adder_tree_latency = add_latency_96bit * 3;
+abs_X_sq_acc_del = delay_srl('cross_product_del', abs_X_sq_acc, cross_product_latency);
 
-% block: untitled/kurtosis_moment_calc_init_xblock/cross_product_del
-cross_product_del_out1 = xSignal('cross_product_del_out1');
-cross_product_del = xBlock(struct('source', 'Delay', 'name', 'cross_product_del'), ...
-    struct('latency', 14), ...
-    {inport1}, ...
-    {cross_product_del_out1});
+% TODO
+abs_X_sq_acc_del2 = round_inf_and_saturate('adder_tree_del', abs_X_sq_acc_del, ...
+    32, 19, 'latency', adder_tree_latency);
+abs_X_sq_mean.bind(scale('scale', abs_X_sq_acc_del2, 0)); % TODO fix this!
+cross_prod_sync_out = xSignal('sync_out');
+d = xSignal();
+f = xSignal();
+a = xSignal();
+c = xSignal();
+b = xSignal();
+abs_mx_sq = xSignal();
+e = xSignal();
+h = xSignal();
 
-% block: untitled/kurtosis_moment_calc_init_xblock/kurtosis_cross_products
-kurtosis_cross_products_out1 = xSignal('sync_out');
-kurtosis_cross_products_out2 = xSignal('4E[|X|^2]|m_x|^2');
-kurtosis_cross_products_out3 = xSignal('4|m_x|^4');
-kurtosis_cross_products_out4 = xSignal('E[|X|^4]');
-kurtosis_cross_products_out5 = xSignal('Re{2E[X^2*conj(m_x^2)]}');
-kurtosis_cross_products_out6 = xSignal('Re{4E[X|X|^2*m_x]}');
-kurtosis_cross_products_out7 = xSignal('|m_x|^2');
-kurtosis_cross_products_out8 = xSignal('|m_x|^4');
-subblockname(blk, 'kurtosis_cross_products')
 kurtosis_cross_products_sub = xBlock(struct('source', @kurtosis_cross_products, 'name', 'kurtosis_cross_products'), ...
-    {subblockname(blk, 'kurtosis_cross_products')}, ...
-    {sync, inport6, inport3, inport7, inport4, inport1, inport2, inport8, inport5}, ...
-    {kurtosis_cross_products_out1, kurtosis_cross_products_out2, kurtosis_cross_products_out3, kurtosis_cross_products_out4, kurtosis_cross_products_out5, kurtosis_cross_products_out6, kurtosis_cross_products_out7, kurtosis_cross_products_out8});
+    {subblockname(blk, 'kurtosis_cross_products'), 'acc_len', acc_len, 'total_latency', cross_product_latency}, ...
+    {sync, m_x_re, m_x_im, X_sq_acc_re, X_sq_acc_im, abs_X_sq_acc, abs_X_4th_acc, X_3rd_acc_re, X_3rd_acc_im}, ...
+    {cross_prod_sync_out, d, f, a, c, b, abs_mx_sq, e, h});
 
-% block: untitled/kurtosis_moment_calc_init_xblock/kurtosis_den
 kurtosis_den_sub = xBlock(struct('source', @kurtosis_den, 'name', 'kurtosis_den'), ...
-    {}, ...
-    {cross_product_del_out1, kurtosis_cross_products_out7}, ...
-    {outport1});
+    {[], 'acc_len', acc_len}, {abs_X_sq_acc_del, abs_mx_sq}, {den});
 
-% block: untitled/kurtosis_moment_calc_init_xblock/kurtosis_num
 kurtosis_num_sub = xBlock(struct('source', @kurtosis_num, 'name', 'kurtosis_num'), ...
-    {}, ...
-    {kurtosis_cross_products_out1, kurtosis_cross_products_out2, kurtosis_cross_products_out3, kurtosis_cross_products_out4, kurtosis_cross_products_out5, kurtosis_cross_products_out6, kurtosis_cross_products_out8}, ...
-    {sync_out, outport2});
+    {[], 'acc_len', acc_len}, {cross_prod_sync_out, d, f, a, c, b, e, h}, {sync_out, num});
+
+channel_out.bind(delay_srl('channel_del', channel_in, adder_tree_latency + cross_product_latency));
 
 end
 
 function kurtosis_cross_products(blk, varargin)
+defaults = {'acc_len', 14, 'total_latency', 15};
+acc_len = get_var('acc_len', 'defaults', defaults, varargin{:});
+bit_width = 17;
+total_latency = get_var('total_latency', 'defaults', defaults, varargin{:});
+
 %% inports
 sync = xInport('sync');
 m_x_re = xInport('Re{E[X]}');
 m_x_im = xInport('Im{E[X]}');
-inport7 = xInport('Re{E[X^2]}');
-inport4 = xInport('Im{E[X^2]}');
-inport1 = xInport('E[|X|^2]');
-inport2 = xInport('E[||X||^4]');
-inport8 = xInport('Re{E[|X|^2X]}');
-inport5 = xInport('Im{E[|X|^2X]}');
+X_sq_acc_re = xInport('Re{E[X^2]}');
+X_sq_acc_im = xInport('Im{E[X^2]}');
+abs_X_sq_acc = xInport('E[|X|^2]');
+abs_X_4th_acc = xInport('E[||X||^4]');
+X_3rd_acc_re = xInport('Re{E[|X|^2X]}');
+X_3rd_acc_im = xInport('Im{E[|X|^2X]}');
 
 %% outports
 sync_out = xOutport('sync_out');
-outport1 = xOutport('4E[|X|^2]|m_x|^2');
-outport2 = xOutport('4|m_x|^4');
-outport3 = xOutport('E[|X|^4]');
-outport4 = xOutport('Re{2E[X^2*conj(m_x^2)]}');
-outport5 = xOutport('Re{4E[X|X|^2*m_x]}');
-outport7 = xOutport('|m_x|^2');
-outport8 = xOutport('|m_x|^4');
+d = xOutport('4E[|X|^2]|m_x|^2');
+f = xOutport('4|m_x|^4');
+a = xOutport('E[|X|^4]');
+c = xOutport('Re{2E[X^2*conj(m_x^2)]}');
+b = xOutport('Re{4E[X|X|^2*m_x]}');
+abs_mx_sq = xOutport('|m_x|^2');
+e = xOutport('|m_x|^4');
+abs_mean_x_sq = xOutport('|E[(x-mx)^2]|^2');
 
 %% Signals
-square_cplx1_out1 = xSignal('square_cplx1_out1');
-square_cplx1_out2 = xSignal('square_cplx1_out2');
-square_real1_out1 = xSignal('square_real1_out1');
-% Mult4_out1 = xSignal('Mult4_out1');
-cmult_conj2_out1 = xSignal('cmult_conj2_out1');
-cmult_conj1_out1 = xSignal('cmult_conj1_out1');
+mx_sq_re = xSignal();
+mx_sq_im = xSignal();
+e_unrounded = xSignal();
+b_unscaled = xSignal();
+cmult_conj1_re = xSignal();
 
 %% diagram
-Convert_out1 = trunc_and_wrap('Convert', square_cplx1_out1, 25, 22);
-Convert1_out1 = trunc_and_wrap('Convert1', square_cplx1_out2, 25, 22);
-Scale4_out1 = scale('Scale4', square_real1_out1, 2);
-outport2.bind(round_inf_and_saturate('Convert3', Scale4_out1, 94, 70, 'latency', 4));
-outport8.bind(round_inf_and_saturate('Convert4', square_real1_out1, 94, 70, 'latency', 4));
+sync_out.bind(delay_srl('del_mult', sync, total_latency));
 
-m_x = ri_to_c('ri_to_c_mx', m_x_re, m_x_im);
-abs_m_x_sq = modulus_sq('abs_mx_sq', m_x, 'bit_width', 25, 'bin_pt', 24);
-abs_m_x_sq_rounded = trunc_and_wrap('Convert5', abs_m_x_sq, 25, 22);
+% xBlock(struct('source', @cmult_behav_init_xblock2, 'name', 'square_cplx1'), ...
+%     {[], 'n_bits_a', 25, 'bin_pt_a', 24, 'n_bits_b', 25, 'bin_pt_b', 24, 'conjugated', 0, ...
+% 	'full_precision', 1, 'cplx_inputs', 0, 'mult_latency', 3, 'add_latency', 2, 'conv_latency', 1}, ...
+%     {m_x_re, m_x_im, m_x_re, m_x_im}, ...
+%     {mx_sq_re, mx_sq_im});
 
-del1_out1 = delay_srl('del1', inport1, 5);
-% Mult4 = xBlock(struct('source', 'Mult', 'name', 'Mult4'), ...
-%     struct('latency', 5), ...
-%     {abs_m_x_sq_rounded, del1_out1}, ...
-%     {Mult4_out1});
-Mult4_out1 = mult('Mult4', abs_m_x_sq_rounded, del1_out1, 'latency', 5);
-Scale_out1 = scale('Scale', cmult_conj2_out1, 2);
-outport4.bind(scale('Scale1', cmult_conj1_out1, 1));
-Scale3_out1 = scale('Scale3', Mult4_out1, 2);
+m_x_re_sq = mult('square_cplx_m1', m_x_re, m_x_re, 'latency', 3);
+m_x_im_sq = mult('square_cplx_m2', m_x_im, m_x_im, 'latency', 3);
+mx_sq_re = subtract('square_cplx_s1', m_x_re_sq, m_x_im_sq, 'latency', 2);
+mx_re_times_mx_im = mult('square_cplx_m3', m_x_re, m_x_im, 'latency', 5);
+mx_sq_im = scale('square_cplx_sc1', mx_re_times_mx_im, 1);
 
-delay_sq1_out1 = delay_srl('delay_sq1', inport7, 6);
-delay_sq2_out1 = delay_srl('delay_sq2', inport4, 6);
-outport1.bind(delay_srl('delay_sq3', Scale3_out1, 4));
-outport5.bind(delay_srl('delay_sq5', Scale_out1, 6));
-outport3.bind(delay_srl('delay_sq6', inport2, 14));
-sync_out.bind(delay_srl('del_mult', sync, 14));
-outport7.bind(delay_srl('del_mult1', abs_m_x_sq_rounded, 9));
+mx_sq_re_rounded = round_inf_and_saturate('Convert', mx_sq_re, 25, 22, 'latency', 1);
+mx_sq_im_rounded = round_inf_and_saturate('Convert1', mx_sq_im, 25, 22, 'latency', 1);
 
-cmult_conj1_sub = xBlock(struct('source', @cmult_behav_init_xblock2, 'name', 'cmult_conj1'), ...
-    {[], 'n_bits_a', 35, 'bin_pt_a', 17, 'n_bits_b', 25, 'bin_pt_b', 22, 'conjugated', 1, ...
-	'full_precision', 1, 'cplx_inputs', 0, 'mult_latency', 3, 'add_latency', 2, 'conv_latency', 0}, ...
-    {delay_sq1_out1, delay_sq2_out1, Convert_out1, Convert1_out1}, ...
-    {cmult_conj1_out1, []});
+% f.bind(round_inf_and_saturate('round_f', f_unrounded, 94, 70, 'latency', 2));
+% e.bind(round_inf_and_saturate('round_e', e_unrounded, 94, 70, 'latency', 2));
 
-cmult_conj2_sub = xBlock(struct('source', @cmult_behav_init_xblock2, 'name', 'cmult_conj2'), ...
-    {[], 'n_bits_a', 35, 'bin_pt_a', 16, 'n_bits_b', 25, 'bin_pt_b', 24, 'conjugated', 1, ...
-	'full_precision', 1, 'cplx_inputs', 0, 'mult_latency', 6, 'add_latency', 2, 'conv_latency', 0}, ...
-    {inport8, inport5, m_x_re, m_x_im}, ...
-    {cmult_conj2_out1, []});
+% m_x = ri_to_c('ri_to_c_mx', m_x_re, m_x_im);
+% abs_m_x_sq = modulus_sq('abs_mx_sq', m_x, 'bit_width', 25, 'bin_pt', 24);
+abs_m_x_sq = add('abs_mx_sq_add1', m_x_re_sq, m_x_im_sq, 'latency', 2);
 
-xBlock(struct('source', @cmult_behav_init_xblock2, 'name', 'square_cplx1'), ...
-    {[], 'n_bits_a', 25, 'bin_pt_a', 24, 'n_bits_b', 25, 'bin_pt_b', 24, 'conjugated', 0, ...
-	'full_precision', 1, 'cplx_inputs', 0, 'mult_latency', 3, 'add_latency', 2, 'conv_latency', 1}, ...
-    {m_x_re, m_x_im, m_x_re, m_x_im}, ...
-    {square_cplx1_out1, square_cplx1_out2});
+% TODO nonzero latency!
+abs_m_x_sq_rounded = round_inf_and_saturate('Convert5', abs_m_x_sq, 25, 22, 'latency', 0);
 
-square_real1_sub = xBlock(struct('source', @square_real_35x25, 'name', 'square_real1'), ...
-    {[]}, ...
-    {abs_m_x_sq_rounded}, ...
-    {square_real1_out1});
+abs_X_sq_acc_del = delay_srl('del1', abs_X_sq_acc, 5);
 
+
+
+X_sq_acc_re_del = delay_srl('delay_sq1', X_sq_acc_re, 6);
+X_sq_acc_im_del = delay_srl('delay_sq2', X_sq_acc_im, 6);
+
+abs_mx_sq.bind(delay_srl('del_absmx_sq', abs_m_x_sq, total_latency-5));
+
+alpha = mult('xsqmx_m1', X_sq_acc_re_del, mx_sq_re_rounded, 'latency', 3);
+beta = mult('xsqmx_m2', X_sq_acc_im_del, mx_sq_im_rounded, 'latency', 3);
+cmult_conj1_re = add('xsqmx_a1', alpha, beta, 'latency', 2);
+% xBlock(struct('source', @cmult_behav_init_xblock2, 'name', 'cmult_conj1'), ...
+%     {[], 'n_bits_a', 35, 'bin_pt_a', 17, 'n_bits_b', 25, 'bin_pt_b', 22, 'conjugated', 1, ...
+% 	'full_precision', 1, 'cplx_inputs', 0, 'mult_latency', 3, 'add_latency', 2, 'conv_latency', 0}, ...
+%     {X_sq_acc_re_del, X_sq_acc_im_del, mx_sq_re_rounded, mx_sq_im_rounded}, ...
+%     {cmult_conj1_re, []});
+
+gamma = mult('x_3__x__mx_m1', X_3rd_acc_re, m_x_re, 'latency', 6);
+delta = mult('x_3__x__mx_m2', X_3rd_acc_im, m_x_im, 'latency', 6);
+b_unscaled = add('x_3__x__mx_a1', gamma, delta, 'latency', 2);
+% xBlock(struct('source', @cmult_behav_init_xblock2, 'name', 'cmult_conj2'), ...
+%     {[], 'n_bits_a', 35, 'bin_pt_a', 17, 'n_bits_b', 25, 'bin_pt_b', 24, 'conjugated', 1, ...
+% 	'full_precision', 1, 'cplx_inputs', 0, 'mult_latency', 6, 'add_latency', 2, 'conv_latency', 0}, ...
+%     {X_3rd_acc_re, X_3rd_acc_im, m_x_re, m_x_im}, ...
+%     {b_unscaled, []});
+
+n_int_bits = 5;
+abs_m_x_sq_25bit = round_inf_and_saturate('conv_25bit', abs_m_x_sq, ...
+    25, 25 - n_int_bits, 'latency', 3);
+abs_m_x_sq_35bit = round_inf_and_saturate('convert_35bit', abs_m_x_sq, ...
+    35, 35 - n_int_bits, 'latency', 3);
+e_unrounded = mult('mult7', abs_m_x_sq_25bit, abs_m_x_sq_35bit);
+% xBlock(struct('source', @square_real_35x25, 'name', 'square_real1'), ...
+%     {[]}, {abs_m_x_sq}, {e_unrounded});
+
+% calc a
+a.bind(delay_srl('m4_del', abs_X_4th_acc, total_latency));
+
+b_adv = scale('Scale', b_unscaled, 2);
+b.bind(delay_srl('delay_b', b_adv, 7));
+
+c_adv = scale('Scale1', cmult_conj1_re, 1);
+c.bind(delay_srl('c_del', c_adv, 4));
+
+d_unscaled = mult('Mult4',  abs_X_sq_acc_del, abs_m_x_sq_rounded, 'latency', 5);
+d_adv = scale('Scale3', d_unscaled, 2);
+d.bind(delay_srl('delay_sq3', d_adv, 5));
+
+e.bind(delay_srl('del_e', e_unrounded, 2));
+
+f_unrounded = scale('Scale4', e_unrounded, 2);
+f.bind(delay_srl('del_f', f_unrounded, 2));
+
+% third term in complex kurtosis
+% TODO the bit width needs to changed based on acc length
+add_latency = 2;
+mx_sq_re_rounded_mb = round_inf_and_saturate('Convert_mx_sq_re', mx_sq_re, 34, 31, 'latency', 0); % Align binary point with 
+mx_sq_im_rounded_mb = round_inf_and_saturate('Convert_mx_sq_im', mx_sq_im, 34, 31, 'latency', 0);
+X_sq_mean_re = scale('scale_m2_re', X_sq_acc_re_del, -acc_len);
+X_sq_mean_im = scale('scale_m2_im', X_sq_acc_im_del, -acc_len);
+[abs_mean_x_re, abs_mean_x_im] = cplx_sub('cplx_sub', {X_sq_mean_re, X_sq_mean_im}, ...
+    {mx_sq_re_rounded_mb, mx_sq_im_rounded_mb}, 'latency', add_latency, 'full_precision', 1);
+
+abs_mean_x_re_sq = mult('mult8', abs_mean_x_re, abs_mean_x_re, 'latency', 4);
+abs_mean_x_im_sq = mult('mult9', abs_mean_x_im, abs_mean_x_im, 'latency', 4);
+% abs_mean_x = ri_to_c('ri2c_abs_mx', abs_mean_x_re, abs_mean_x_im);
+abs_mean_x_sq.bind(add('add1', abs_mean_x_re_sq, abs_mean_x_im_sq, 'latency', 3));
+% abs_mean_x_sq.bind(modulus_sq('abs_mean_xsq', abs_mean_x, 'bit_width', 36, ...
+%     'bin_pt', 32, 'mult_latency', 4, 'add_latency', 3));
 end
 
 
-function kurtosis_den()
-acc_len = 2^14;
+function kurtosis_den(blk, varargin)
+defaults = {'acc_len', 14};
+acc_len = get_var('acc_len', 'defaults', defaults, varargin{:});
+
 %% inports
 sum_abs_x_sq = xInport('E[|X|^2]');
 abs_m_x_sq = xInport('|m_x|^2');
@@ -148,21 +204,9 @@ abs_m_x_sq = xInport('|m_x|^2');
 second_central_moment_squared = xOutport('E[|X-m_x|^2]^2');
 
 %% diagram
+mean_abs_x_sq = scale('scale', sum_abs_x_sq, -acc_len);
+second_central_moment_unrounded = subtract('Sub', mean_abs_x_sq, abs_m_x_sq, 'latency', 4);
 
-% mean_abs_x_sq = xSignal();
-mean_abs_x_sq = scale('scale', sum_abs_x_sq, -log2(acc_len));
-%xBlock(struct('source', 'Scale', 'name', 'scale'), ...
-%    {'scale_factor', -log2(acc_len)}, {sum_abs_x_sq}, {mean_abs_x_sq});
-
-% block: untitled/kurtosis_moment_calc_init_xblock/kurtosis_den/AddSub
-second_central_moment_unrounded = xSignal('xlsub3_AddSub_out1');
-xlsub3_AddSub = xBlock(struct('source', 'AddSub', 'name', 'AddSub'), ...
-    struct('mode', 'Subtraction', ...
-    'latency', 4), ...
-    {mean_abs_x_sq, abs_m_x_sq}, ...
-    {second_central_moment_unrounded});
-
-% block: untitled/kurtosis_moment_calc_init_xblock/kurtosis_den/square_real1
 square_real_35x25_sub = xBlock(struct('source', @square_real_35x25, 'name', 'square_real1'), ...
     {[]}, ...
     {second_central_moment_unrounded}, ...
@@ -188,100 +232,50 @@ a_25bit = round_inf_and_saturate('convert_25bit', a, 25, 25 - n_int_bits, 'laten
 a_sq.bind(mult('Mult', a_35bit, a_25bit, 'latency', mult_latency));
 end
 
-
-
-function kurtosis_num()
+function kurtosis_num(blk, varargin)
+defaults = {'acc_len', 14};
+acc_len = get_var('acc_len', 'defaults', defaults, varargin{:});
 add_latency = 4;
-acc_len = 14;
-
 output_dtype = fi_dtype(1, 90, 68);
+
 %% inports
-xlsub3_sync = xInport('sync');
-xlsub3_inport1 = xInport('4E[|X|^2]|m_x|^2');
-xlsub3_inport2 = xInport('4|m_x|^4');
-xlsub3_inport3 = xInport('E[|X|^4]');
-xlsub3_inport4 = xInport('Re{2E[X^2*conj(m_x^2)]}');
-xlsub3_inport5 = xInport('Re{4E[X|X|^2*m_x]}');
-xlsub3_inport7 = xInport('|m_x|^4');
+sync = xInport('sync');
+d = xInport('4E[|X|^2]|m_x|^2');
+f = xInport('4|m_x|^4');
+a = xInport('E[|X|^4]');
+c = xInport('Re{2E[X^2*conj(m_x^2)]}');
+b = xInport('Re{4E[X|X|^2*m_x]}');
+e = xInport('|m_x|^4');
+h = xInport('|E[(x-mx)^2]|^2');
 
 %% outports
-xlsub3_sync_out = xOutport('sync_out');
+sync_out = xOutport('sync_out');
 fourth_central_moment_rounded = xOutport('E[|X-m_x|^4]');
-fourth_central_moment = xSignal();
 
 %% diagram
+% scale factors
+a_round = trunc_and_wrap('trunc_a', a, 89, 65);
+a_scale = scale('scale_a', a_round, -acc_len);
+b_scale = scale('scale_b', b, -acc_len);
+c_scale = scale('scale_c', c, -acc_len);
+d_scale = scale('scale_d', d, -acc_len);
 
-% block: untitled/kurtosis_moment_calc_init_xblock/kurtosis_num/AddSub
-% xlsub3_AddSub_out1 = xSignal('xlsub3_AddSub_out1');
-xlsub3_AddSub_out1 = subtract('AddSub', xlsub3_inport7, xlsub3_inport2, 'latency', add_latency, 'full_precision', 0, 'type_ab', output_dtype);
-% xlsub3_AddSub = xBlock(struct('source', 'AddSub', 'name', 'AddSub'), ...
-%     struct('mode', 'Subtraction', ...
-%     'latency', add_latency, ...
-%     'precision', 'User Defined', ...
-%     'arith_type', 'Signed  (2''s comp)', ...
-%     'n_bits', 90, ...
-%     'bin_pt', 68), ...
-%     {xlsub3_inport7, xlsub3_inport2}, ...
-%     {xlsub3_AddSub_out1});
+% adder layer 1
+e_minus_f = subtract('sub_ef', e, f, 'latency', add_latency, 'full_precision', 1, 'type_ab', output_dtype);
+c_minus_b = subtract('sub_cb', c_scale, b_scale, 'latency', add_latency, 'full_precision', 1, 'type_ab', output_dtype);
+a_del = delay_srl('a_del', a_scale, add_latency);
 
-% block: untitled/kurtosis_moment_calc_init_xblock/kurtosis_num/AddSub1
-% xlsub3_AddSub1_out1 = xSignal('xlsub3_AddSub1_out1');
-xlsub3_AddSub1_out1 = subtract('AddSub1', xlsub3_inport4, xlsub3_inport5, 'latency', add_latency, 'full_precision', 0, 'type_ab', output_dtype);
-% xlsub3_AddSub1 = xBlock(struct('source', 'AddSub', 'name', 'AddSub1'), ...
-%     struct('mode', 'Subtraction', ...
-%     'latency', add_latency, ...
-%     'precision', 'User Defined', ...
-%     'arith_type', 'Signed  (2''s comp)', ...
-%     'n_bits', 90, ...
-%     'bin_pt', 68, ...
-%     'use_behavioral_HDL', 'on', ...
-%     'hw_selection', 'DSP48', ...
-%     'pipelined', 'on'), ...
-%     {xlsub3_inport4, xlsub3_inport5}, ...
-%     {xlsub3_AddSub1_out1});
+d_minus_h = subtract('sub_dh', d_scale, h, 'latency', add_latency, 'full_precision', 1, 'type_ab', output_dtype);%delay_srl('d_del', d, add_latency);
 
-% block: untitled/kurtosis_moment_calc_init_xblock/kurtosis_num/AddSub2
-% xlsub3_delay_sq8_out1 = xSignal('xlsub3_delay_sq8_out1');
-xlsub3_delay_sq8_out1 = delay_srl('delay_sq8', xlsub3_inport3, add_latency);
-xlsub3_AddSub2_out1 = add('AddSub2', xlsub3_AddSub_out1, xlsub3_delay_sq8_out1, 'latency', add_latency, 'full_precision', 0, 'type_ab', output_dtype);
-% xlsub3_AddSub2_out1 = xSignal('xlsub3_AddSub2_out1');
-% xlsub3_AddSub2 = xBlock(struct('source', 'AddSub', 'name', 'AddSub2'), ...
-%     struct('latency', add_latency, ...
-%     'precision', 'User Defined', ...
-%     'arith_type', 'Signed  (2''s comp)', ...
-%     'n_bits', 90, ...
-%     'bin_pt', 68), ...
-%     {xlsub3_AddSub_out1, xlsub3_delay_sq8_out1}, ...
-%     {xlsub3_AddSub2_out1});
+% adder layer 2
+a_plus_e_minus_f = add('add_aef', e_minus_f, a_del, 'latency', add_latency, 'full_precision', 1, 'type_ab', output_dtype);
+d_plus_c_minus_b = add('add_dcb', d_minus_h, c_minus_b, 'latency', add_latency, 'full_precision', 1, 'type_ab', output_dtype);
 
-% block: untitled/kurtosis_moment_calc_init_xblock/kurtosis_num/AddSub3
-% xlsub3_AddSub4_out1 = xSignal('xlsub3_AddSub4_out1');
-xlsub3_delay_sq1_out1 = delay_srl('delay_sq1', xlsub3_inport1, add_latency);
-xlsub3_AddSub4_out1 = add('AddSub4', xlsub3_delay_sq1_out1, xlsub3_AddSub1_out1, 'latency', add_latency, 'full_precision', 0, 'type_ab', output_dtype);
-fourth_central_moment = add('AddSub3', xlsub3_AddSub2_out1, xlsub3_AddSub4_out1, 'latency', add_latency', 'full_precision', 0, 'type_ab', output_dtype);
-% 
-% xlsub3_AddSub3 = xBlock(struct('source', 'AddSub', 'name', 'AddSub3'), ...
-%     struct('latency', add_latency, ...
-%     'precision', 'User Defined', ...
-%     'arith_type', 'Signed  (2''s comp)', ...
-%     'n_bits', 90, ...
-%     'bin_pt', 68), ...
-%     {xlsub3_AddSub2_out1, xlsub3_AddSub4_out1}, ...
-%     {fourth_central_moment});
+fourth_central_moment_rounded.bind(add('add', a_plus_e_minus_f, d_plus_c_minus_b, 'latency', add_latency', 'full_precision', 1, 'type_ab', output_dtype));
 
 % Rescale output
-fourth_central_moment_rounded.bind(scale('rescale_4th_moment', fourth_central_moment, -acc_len));
+% fourth_central_moment_rounded.bind(scale('rescale_4th_moment', fourth_central_moment, -acc_len));
 
-% block: untitled/kurtosis_moment_calc_init_xblock/kurtosis_num/AddSub4
-% xlsub3_AddSub4 = xBlock(struct('source', 'AddSub', 'name', 'AddSub4'), ...
-%     struct('latency', add_latency, ...
-%     'precision', 'User Defined', ...
-%     'arith_type', 'Signed  (2''s comp)', ...
-%     'n_bits', 90, ...
-%     'bin_pt', 68), ...
-%     {xlsub3_delay_sq1_out1, xlsub3_AddSub1_out1}, ...
-%     {xlsub3_AddSub4_out1});
-
-xlsub3_sync_out.bind(delay_srl('sync_del', xlsub3_sync, 3*add_latency));
+% sync delay
+sync_out.bind(delay_srl('sync_del', sync, 3*add_latency));
 end
-
