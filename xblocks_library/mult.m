@@ -1,4 +1,5 @@
-function [ab] = mult(name, a, b, varargin)
+function [ab, ab_dtype] = mult(name, a, b, varargin)
+% [ab] = mult(name, a, b, varargin)
 
 type_a_default = fi_dtype(1, 18, 17);
 type_b_default = fi_dtype(1, 18, 17);
@@ -18,8 +19,10 @@ overflow = get_var('overflow', 'defaults', defaults, varargin{:});
 % derived parameters
 if full_precision == 0
     precision = 'User Defined';
+    ab_dtype = type_ab;
 else
     precision = 'Full';
+    ab_dtype = extract_fi_dtype(type_a * type_b);
 end
 
 if (type_a.Signed || type_b.Signed)

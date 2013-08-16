@@ -1,5 +1,5 @@
-function [ab, ab_dtype] = subtract(name, a, b, varargin)
-% subtract(name, a, b, varargin)
+function [ab, ab_dtype] = add(name, a, b, varargin)
+
 type_a_default = fi_dtype(1, 18, 17);
 type_b_default = fi_dtype(1, 18, 17);
 type_ab_default = fi_dtype(1, 36, 34);
@@ -21,7 +21,7 @@ if full_precision == 0
     ab_dtype = type_ab;
 else
     precision = 'Full';
-    ab_dtype = extract_fi_dtype(type_a - type_b);
+    ab_dtype = extract_fi_dtype(type_a + type_b);
 end
 
 if (type_a.Signed || type_b.Signed)
@@ -30,7 +30,7 @@ else
     arith_type = 'Unsigned';
 end
 
-mode = 'Subtraction';
+mode = 'Addition';
 
 % block instantiation
 config.source = 'AddSub';

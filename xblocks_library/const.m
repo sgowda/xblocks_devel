@@ -1,4 +1,5 @@
-function [val] = const(name, fl_val, dtype)
+function [val] = const(name, fl_val, dtype, varargin)
+% function [val] = const(name, fl_val, dtype, varargin)
 
 config.source = 'Constant';
 config.name = name;
