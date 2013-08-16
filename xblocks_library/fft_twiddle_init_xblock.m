@@ -103,22 +103,26 @@ twiddle_type = get_var('twiddle_type', 'defaults', defaults, varargin{:});
 
 %% Module Drawing
 % convert 'a' input to real/imag
-a_re = xSignal;
-a_im = xSignal;
-c_to_ri_a = xBlock(struct('source', str2func('c_to_ri_init_xblock'), 'name', 'c_to_ri_a'), ...
-    {strcat(blk, '/c_to_ri_a'),input_bit_width, input_bit_width-1}, {a}, {a_re, a_im});
+% a_re = xSignal;
+% a_im = xSignal;
+% c_to_ri_a = xBlock(struct('source', str2func('c_to_ri_init_xblock'), 'name', 'c_to_ri_a'), ...
+%     {strcat(blk, '/c_to_ri_a'),input_bit_width, input_bit_width-1}, {a}, {a_re, a_im});
+[a_re, a_im] = c_to_ri('c_to_ri_a', a, input_bit_width, input_bit_width-1);
 
 % convert 'b' input to real/imag
-b_re = xSignal;
-b_im = xSignal;
-c_to_ri_b = xBlock(struct('source', str2func('c_to_ri_init_xblock'), 'name', 'c_to_ri_b'), ...
-    {strcat(blk, '/c_to_ri_b'),input_bit_width, input_bit_width-1}, {b}, {b_re, b_im});
+% b_re = xSignal;
+% b_im = xSignal;
+% c_to_ri_b = xBlock(struct('source', str2func('c_to_ri_init_xblock'), 'name', 'c_to_ri_b'), ...
+%     {strcat(blk, '/c_to_ri_b'),input_bit_width, input_bit_width-1}, {b}, {b_re, b_im});
+
+[b_re, b_im] = c_to_ri('c_to_ri_b', b, input_bit_width, input_bit_width-1);
 
 % convert 'w' input to real/imag
-w_re = xSignal;
-w_im = xSignal;
-c_to_ri_w = xBlock(struct('source', str2func('c_to_ri_init_xblock'), 'name', 'c_to_ri_w'), ...
-    {strcat(blk, '/c_to_ri_w'),input_bit_width, input_bit_width-1}, {w}, {w_re, w_im});
+% w_re = xSignal;
+% w_im = xSignal;
+% c_to_ri_w = xBlock(struct('source', str2func('c_to_ri_init_xblock'), 'name', 'c_to_ri_w'), ...
+%     {strcat(blk, '/c_to_ri_w'),input_bit_width, input_bit_width-1}, {w}, {w_re, w_im});
+[w_re, w_im] = c_to_ri('c_to_ri_w', w, input_bit_width, input_bit_width-1);
 
 if ismember(twiddle_type, {'twiddle_pass_through', 'twiddle_stage_2', 'twiddle_general_dsp48e', 'twiddle_coeff_0'})
     % delay inputs by input_latency length
@@ -172,8 +176,12 @@ switch twiddle_type
         xBlock(struct('source', 'simulink/Sinks/Terminator', 'name', 'coeff_term'), ...
             {}, {w}, {});
     case 'twiddle_general_dsp48e'
+        % TODO the latency on w_re is not guaranteed to match if
+        % input_latency is nonzero
+        
         disp('twiddle_general_dsp48e');
-        twiddle_general_dsp48e_draw_init_xblock(a_re_del, a_im_del, b_re_del, b_im_del, sync_del, ...
+        twiddle_general_dsp48e_draw_init_xblock(a_re_del, a_im_del, b_re_del, ...
+            b_im_del, w_re, w_im, sync_del, ...
             a_re_out, a_im_out, bw_re_out, bw_im_out, sync_out, ...
             ActualCoeffs, StepPeriod, coeff_bit_width, input_bit_width, bram_latency,...
             conv_latency, quantization, overflow, arch, coeffs_bram, FFTSize);
