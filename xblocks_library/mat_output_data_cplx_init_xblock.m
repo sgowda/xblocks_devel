@@ -10,7 +10,8 @@ SaveFormat = get_var('SaveFormat', 'defaults', defaults, varargin{:});
 In1 = xInport(var_name);
 
 %% outports
-
+out = xOutport('_o');
+out.bind(In1);
 %% diagram
 
 % block: fft_biplex_core/mat_output_data_cplx_init_xblock/c_to_ri
