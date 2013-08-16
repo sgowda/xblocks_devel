@@ -147,9 +147,6 @@ for stage=0:FFTSize,
     end
 end
 
-% node_inputs = cell(n_inputs, FFTSize+1);
-% node_inputs{:,1} = direct_form_inputs;
-
 % initialize bf_syncs
 bf_syncs = xblock_new_bus(n_inputs, FFTSize+1);
 for k=1:n_inputs
@@ -185,7 +182,7 @@ for stage=1:FFTSize,
 
 	stage_of_outputs = {};
     
-    bf_input_pairs = cornerturn(1:n_inputs, stage);
+    bf_input_pairs = rad2_dit_butterfly_data_pairing(1:n_inputs, stage);
     node_outputs_temp = xblock_new_bus(n_inputs, 1);
 
     FFTStage = stage;
