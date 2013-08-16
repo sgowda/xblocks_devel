@@ -172,5 +172,6 @@ opmode_negb_im = xBlock(struct('source', 'Constant', 'name', 'opmode_negb_im'), 
 if ~isempty(blk) && ~strcmp(blk(1),'/')
     clean_blocks(blk);
 end
+
 end
 
