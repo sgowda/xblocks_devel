@@ -1,7 +1,7 @@
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 %                                                                             %
 %   Center for Astronomy Signal Processing and Electronics Research           %
-%   http://casper.berkeley.edu                                                %      
+%   http://casper.berkeley.edu                                                %
 %   Copyright (C) 2011 Suraj Gowda    Hong Chen                               %
 %                                                                             %
 %   This program is free software; you can redistribute it and/or modify      %
@@ -20,41 +20,26 @@
 %                                                                             %
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 function ri_to_c_init_xblock(varargin)
-
-
-
 %% inports
-xlsub3_re = xInport('re');
-xlsub3_im = xInport('im');
+re = xInport('re');
+im = xInport('im');
 
 %% outports
-xlsub3_c = xOutport('c');
+c = xOutport('c');
 
 %% diagram
 
 % block: untitled/butterfly_direct/ri_to_c01/concat
-xlsub3_force_re_out1 = xSignal;
-xlsub3_force_im_out1 = xSignal;
-xlsub3_concat = xBlock(struct('source', 'Concat', 'name', 'concat'), ...
-                       [], ...
-                       {xlsub3_force_re_out1, xlsub3_force_im_out1}, ...
-                       {xlsub3_c});
+re_reinterp = xSignal;
+im_reinterp = xSignal;
+concat = xBlock(struct('source', 'Concat', 'name', 'concat'), ...
+    [], {re_reinterp, im_reinterp}, {c});
 
 % block: untitled/butterfly_direct/ri_to_c01/force_im
-xlsub3_force_im = xBlock(struct('source', 'Reinterpret', 'name', 'force_im'), ...
-                         struct('force_arith_type', 'on', ...
-                                'force_bin_pt', 'on'), ...
-                         {xlsub3_im}, ...
-                         {xlsub3_force_im_out1});
+force_im = xBlock(struct('source', 'Reinterpret', 'name', 'force_im'), ...
+    struct('force_arith_type', 'on', 'force_bin_pt', 'on'), {im}, {im_reinterp});
 
 % block: untitled/butterfly_direct/ri_to_c01/force_re
-xlsub3_force_re = xBlock(struct('source', 'Reinterpret', 'name', 'force_re'), ...
-                         struct('force_arith_type', 'on', ...
-                                'force_bin_pt', 'on'), ...
-                         {xlsub3_re}, ...
-                         {xlsub3_force_re_out1});
-
-
-
+force_re = xBlock(struct('source', 'Reinterpret', 'name', 'force_re'), ...
+    struct('force_arith_type', 'on', 'force_bin_pt', 'on'), {re}, {re_reinterp});
 end
-
