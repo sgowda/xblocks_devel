@@ -2,12 +2,14 @@ function dsp48e_ctrl_init_xblock(blk, varargin)
 defaults = {'opmode', '0000000', ...
     'alumode', '0000', ...
     'carryin', '0', ...
-    'carryinsel', '000'};
+    'carryinsel', '000', ...
+    'consolidate_ports', 1};
 
 opmode = get_var('opmode', 'defaults', defaults, varargin{:});
 alumode = get_var('alumode', 'defaults', defaults, varargin{:});
 carryin = get_var('carryin', 'defaults', defaults, varargin{:});
 carryinsel = get_var('carryinsel', 'defaults', defaults, varargin{:});
+consolidate_ports = get_var('consolidate_ports', 'defaults', defaults, varargin{:});
 
 %% Error checking for input types
 if ~strcmp(class(opmode), 'char')
@@ -44,20 +46,27 @@ if ~(length(carryinsel) == 3)
 end
 
 
-%% outports
-Out1 = xOutport('Out1');
-
 %% diagram
 
 % block: butterfly/apbw/dsp48e_ctrl_init_xblock/Concat
-carryinsel0_out1 = xSignal('carryinsel0_out1');
-carryin0_out1 = xSignal('carryin0_out1');
-alumode0_out1 = xSignal('alumode0_out1');
-opmode0_out1 = xSignal('opmode0_out1');
-Concat = xBlock(struct('source', 'Concat', 'name', 'Concat'), ...
-                       struct('num_inputs', 4), ...
-                       {carryinsel0_out1, carryin0_out1, alumode0_out1, opmode0_out1}, ...
-                       {Out1});
+if consolidate_ports
+    carryinsel0_out1 = xSignal('carryinsel0');
+    carryin0_out1 = xSignal('carryin0');
+    alumode0_out1 = xSignal('alumode0');
+    opmode0_out1 = xSignal('opmode0');
+    
+    Out1 = xOutport('dsp48e_op');
+    Concat = xBlock(struct('source', 'Concat', 'name', 'Concat'), ...
+                           struct('num_inputs', 4), ...
+                           {carryinsel0_out1, carryin0_out1, alumode0_out1, opmode0_out1}, ...
+                           {Out1});
+                       
+else
+    opmode0_out1 = xOutport('opmode');
+    alumode0_out1 = xOutport('alumode');
+    carryin0_out1 = xOutport('carryin');
+    carryinsel0_out1 = xOutport('carryinsel');
+end
 
 % block: butterfly/apbw/dsp48e_ctrl_init_xblock/alumode0
 alumode0 = xBlock(struct('source', 'Constant', 'name', 'alumode0'), ...
