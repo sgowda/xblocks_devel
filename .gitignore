@@ -1,3 +1,9 @@
 *.swp
 *.autosave
 *.log
+*.htm
+*/slprj/
+*/untitled_grt_rtw/
+*.r2009b
+*.m~
+*.bak
