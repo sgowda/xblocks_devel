@@ -20,8 +20,8 @@ conv_latency = get_var('conv_latency', 'defaults', defaults, varargin{:});
 % triple_type_x_acc_rounded   = fi_dtype(1, 35, 35-(triple_type_x_acc.WordLength - triple_type_x_acc.FractionLength));
 % quad_type_x_acc_rounded     = quad_type_x_acc;
 
-[m_x_type_unr, x_sq_type_unr, x_3rd_type_unr, x_4th_type_unr] = acc_types(type_x, acc_len);
-[m_x_type, x_sq_type, x_3rd_type, x_4th_type] = acc_rounding_types(type_x, acc_len);
+[m_x_type_unr, x_sq_type_unr, x_3rd_type_unr, x_4th_type_unr] = kurtosis_acc_types(type_x, acc_len);
+[m_x_type, x_sq_type, x_3rd_type, x_4th_type] = kurtosis_acc_rounding_types(type_x, acc_len);
 
 
 %% inports

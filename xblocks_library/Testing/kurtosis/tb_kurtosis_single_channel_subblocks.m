@@ -105,15 +105,15 @@ for k=1:n_vecs
     fi_data = X_fi(vec_len*(k-1)+2:vec_len*k+1);
     x_re = fi(real(fi_data), 1, 18, 17);
     x_im = fi(imag(fi_data), 1, 18, 17);
-    [kappa_x_fi(k), kurtosis_num_fi, second_abs_moment_sq_fi, fourth_abs_moment_fi, mean_power_fi] = excess_kurtosis_complex_stream_fi(x_re, x_im);
-    [kappa_x_fi(k), kurtosis_num_fi2, second_abs_moment_sq_fi2, mean_power_fi2] = excess_kurtosis_complex_stream_fi2(x_re, x_im);
+%     [kappa_x_fi(k), kurtosis_num_fi, second_abs_moment_sq_fi, fourth_abs_moment_fi, mean_power_fi] = excess_kurtosis_complex_stream_fi(x_re, x_im);
+    [kappa_x_fi(k), kurtosis_num_fi, kurtosis_den_fi, mean_power_fi] = excess_kurtosis_complex_stream_fi(x_re, x_im);
     [kappa_x(k), kurtosis_num, second_abs_moment_sq,] = excess_kurtosis_complex(fi_data);
     
-    fl_error_num(k) = kurtosis_num - double(kurtosis_num_fi2);
-    fl_error_den(k) = second_abs_moment_sq - double(second_abs_moment_sq_fi2);
+    fl_error_num(k) = kurtosis_num - double(kurtosis_num_fi);
+    fl_error_den(k) = second_abs_moment_sq - double(kurtosis_den_fi);
 
-    fourth_moment_diff(k) = fourth_central_moment(valid_inds(k)) - kurtosis_num_fi2;
-    second_moment_diff(k) = second_abs_moment_sq_fi2 - kurtosis_den(valid_inds(k));
+    fourth_moment_diff(k) = fourth_central_moment(valid_inds(k)) - kurtosis_num_fi;
+    second_moment_diff(k) = kurtosis_den_fi - kurtosis_den(valid_inds(k));
 
 end
 second_moment_diff

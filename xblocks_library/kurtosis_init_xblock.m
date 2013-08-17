@@ -1,4 +1,4 @@
-function [] = kurtosis_single_channel_init_xblock(blk, varargin)
+function [] = kurtosis_init_xblock(blk, varargin)
 %% Config
 defaults = {'acc_len', 15, 'n_inputs', 1};
 acc_len = get_var('acc_len', 'defaults', defaults, varargin{:});
@@ -41,7 +41,7 @@ end
 
 %--- Draw serializers
 ld = delay_srl('load_del', origin_moments_acc_rounded{1,1}, 1);
-[m_x_type, x_sq_type, x_3rd_type, x_4th_type] = acc_rounding_types(type_x, acc_len);
+[m_x_type, x_sq_type, x_3rd_type, x_4th_type] = kurtosis_acc_rounding_types(type_x, acc_len);
 channel = xSignal();
 valid_ser = xSignal();
 m_x_re = xSignal();

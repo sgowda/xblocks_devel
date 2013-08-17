@@ -2,7 +2,7 @@ function kurtosis_moment_calc_init_xblock(blk, varargin)
 defaults = {'acc_len', 14, 'type_x', fi_dtype(1, 18, 17)};
 acc_len = get_var('acc_len', 'defaults', defaults, varargin{:});
 type_x = get_var('type_x', 'defaults', defaults, varargin{:});
-[m_x_type, x_sq_type, x_3rd_type, x_4th_type] = acc_rounding_types(type_x, acc_len);
+[m_x_type, x_sq_type, x_3rd_type, x_4th_type] = kurtosis_acc_rounding_types(type_x, acc_len);
 bit_width_power = 32;
 bit_width_num = 96;
 bit_width_den = 64;
@@ -53,7 +53,7 @@ xBlock(struct('source', @kurtosis_cross_products, 'name', 'kurtosis_cross_produc
 
 % cross-product data types
 [a_dtype, b_dtype, c_dtype, d_dtype, e_dtype, f_dtype, abs_m_x_sq_dtype, abs_mean_x_sq_dtype] = ...
-    excess_complex_kurtosis_cross_product_dtypes(m_x_type, m_x_type, ...
+    kurtosis_cross_product_dtypes(m_x_type, m_x_type, ...
     x_sq_type, x_sq_type, x_sq_type, x_4th_type, x_3rd_type, x_3rd_type, 'acc_len', acc_len);
 
 % denominator
@@ -77,7 +77,7 @@ acc_len = get_var('acc_len', 'defaults', defaults, varargin{:});
 type_x = get_var('type_x', 'defaults', defaults, varargin{:});
 bit_width = 17;
 total_latency = get_var('total_latency', 'defaults', defaults, varargin{:});
-[m_x_dtype, x_sq_dtype, x_3_dtype, x_4th_type] = acc_rounding_types(type_x, acc_len);
+[m_x_dtype, x_sq_dtype, x_3_dtype, x_4th_type] = kurtosis_acc_rounding_types(type_x, acc_len);
 
 %% inports
 sync = xInport('sync');
