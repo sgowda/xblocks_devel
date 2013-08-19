@@ -147,10 +147,10 @@ f_sig = delay_srl('del_f', f_adv, 2);
 
 % third term in complex kurtosis
 add_latency = 2;
-mx_sq_re_del = delay_srl('del2', mx_sq_re, 1);
-mx_sq_im_del = delay_srl('del3', mx_sq_im, 1);
-[mx_sq_re_rounded_mb, mx_sq_re_rounded_mb_dtype] = round_to_wordlength('conv_mx_sq_re', mx_sq_re_del, 35, mx_sq_re_dtype, 'latency', 0);
-[mx_sq_im_rounded_mb, mx_sq_im_rounded_mb_dtype] = round_to_wordlength('conv_mx_sq_im', mx_sq_im_del, 35, mx_sq_im_dtype, 'latency', 0);
+% mx_sq_re_del = delay_srl('del2', mx_sq_re, 1);
+% mx_sq_im_del = delay_srl('del3', mx_sq_im, 0);
+[mx_sq_re_rounded_mb, mx_sq_re_rounded_mb_dtype] = round_to_wordlength('conv_mx_sq_re', mx_sq_re, 35, mx_sq_re_dtype, 'latency', 1);
+[mx_sq_im_rounded_mb, mx_sq_im_rounded_mb_dtype] = round_to_wordlength('conv_mx_sq_im', mx_sq_im, 35, mx_sq_im_dtype, 'latency', 1);
 [X_sq_mean_re, X_sq_mean_re_dtype] = scale('scale_m2_re', X_sq_acc_re_del, -acc_len, 'type_x', x_sq_dtype);
 [X_sq_mean_im, X_sq_mean_im_dtype] = scale('scale_m2_im', X_sq_acc_im_del, -acc_len, 'type_x', x_sq_dtype);
 [abs_mean_x_re, abs_mean_x_im, abs_mean_x_dtype] = cplx_sub('cplx_sub', {X_sq_mean_re, X_sq_mean_im}, ...
