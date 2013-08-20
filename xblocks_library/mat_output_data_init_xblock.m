@@ -10,6 +10,10 @@ SaveFormat = get_var('SaveFormat', 'defaults', defaults, varargin{:});
 %% inports
 input = xInport(var_name);
 
+%% outports
+output = xOutport('_o');
+output.bind(input);
+
 %% diagram
 to_workspace_input = xSignal();
 xBlock( struct('source', 'simulink/Sinks/To Workspace', 'name', 'workspace_input'), ...
