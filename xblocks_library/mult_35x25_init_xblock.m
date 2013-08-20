@@ -94,9 +94,9 @@ DSP48E_1 = xBlock(struct('source', 'DSP48E', 'name', 'DSP48E_1'), ...
 
 
 
-reinterp_concat_0_out1 = reinterp_uint('reinterp_concat_0', prod_lsb);
-pipe_del3_out1         = delay_srl('del2', reinterp_concat_0_out1, 1);
-reinterp_concat_1_out1 = reinterp_uint('reinterp_concat_1', prod_msb);
-AB_int                 = concatenate('concat', {reinterp_concat_1_out1, pipe_del3_out1});
-AB_sig                 = reinterpret('reinterp_concat_2', AB_int, fi_dtype(1, 60, bin_pt));
+AB_int_lsb     = reinterp_uint('reinterp_lsb', prod_lsb);
+AB_int_lsb_del = delay_srl('del2', AB_int_lsb, 1);
+AB_int_msb     = reinterp_uint('reinterp_msb', prod_msb);
+AB_int         = concatenate('concat', {AB_int_msb, AB_int_lsb_del});
+AB_sig         = reinterpret('reinterp_prod', AB_int, fi_dtype(1, 60, bin_pt));
 AB.bind(AB_sig);
