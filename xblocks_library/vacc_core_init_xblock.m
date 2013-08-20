@@ -30,8 +30,8 @@ if use_dsp48
 end
 
 %% inports
-din = xblock_new_inputs('din', n_inputs, 1);
 acc_en = xInport('acc_en');
+din = xblock_new_inputs('din', n_inputs, 1);
 
 %% outports
 dout = xblock_new_outputs('dout', n_inputs, 1); 
@@ -56,10 +56,17 @@ end
 delay_bram_config.source = str2func('delay_bram_init_xblock');
 delay_bram_config.name = ['acc_mem',num2str(k)];
 bram_delay = veclen-add_latency-mux_latency;
-delay_bram_params = {[], 'latency', bram_delay, 'bram_latency', bram_latency, ...
-    'n_inputs', n_inputs};
-xBlock( delay_bram_config, delay_bram_params, del_bram_in, din_del);
-    
+
+if bram_delay <= bram_latency % implement using SRLs
+    for k=1:n_inputs
+        din_del{k}.bind(delay_srl(sprintf('acc_mem_%d', k), del_bram_in{k}, bram_delay));
+    end
+else
+    delay_bram_params = {[], 'latency', bram_delay, 'bram_latency', bram_latency, ...
+        'n_inputs', n_inputs};
+    xBlock(delay_bram_config, delay_bram_params, del_bram_in, din_del);
+end
+   
 
 end
 

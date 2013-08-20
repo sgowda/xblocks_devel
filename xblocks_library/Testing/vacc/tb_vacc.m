@@ -3,36 +3,41 @@ clc; clear; close all
 mdl_name = 'vacc';
 eval(mdl_name); % open design
 
-%% Test parameters to sweep over
-veclen = [3, 4, 5, 6, 7, 8, 9, 10];
-acc_len = 9;
-
 %% Generate simulation inputs
-data_len = max(veclen)*(acc_len + 1);
+veclen = 2;
+n_vecs = 10;
 
-T_sim = 10000;
-data_len = T_sim - max(latencies) - max(bram_latencies) - 1;
-[din, din_data] = data_burst_real(data_len, T_sim, 1);
+acc_len = 2;
+din_data = randn(2^veclen, n_vecs) / 4;
 din_data_fi = double(fi(din_data, 1, 18, 17)); % TODO use 'quantize' function
-din = construct_sim_timeseries(din_data_fi, T_sim);
+
+T_sim = (n_vecs + 1)*2^veclen;
+din = construct_sim_timeseries(din_data_fi(:)', T_sim);
 
 %% Re-draw blocks
-for latency=latencies
-    for bram_latency=bram_latencies
-        config.source = @vacc_init_xblock;
-        config.toplevel = subblockname(mdl_name, 'vacc');
-        xBlock(config, {config.toplevel});
+
+config.source = @vacc_init_xblock;
+config.toplevel = subblockname(mdl_name, 'vacc');
+xBlock(config, {config.toplevel, 'veclen', veclen});
         
-        %-- Simulate
-        % Set simulation time
-        set_param(mdl_name, 'StopTime', num2str(T_sim-1));
+%% Simulate
+% Set simulation time
+set_param(mdl_name, 'StopTime', num2str(T_sim-1));
 
-        % Run simulation
-        sim(mdl_name)
+% Run simulation
+sim(mdl_name)
 
-        %-- Verify
-        start = 1;
-        x = [0, din_data_fi]';
-        all(x == dout(latency+start : latency+start+length(din_data)))        
-    end
+%% Verify
+n_accs = n_vecs / acc_len;
+acc_vecs = zeros(2^veclen, n_accs);
+for k=1:n_accs
+    acc_vecs(:,k) = sum(din_data_fi(:, (k-1)*acc_len+1:k*acc_len), 2);
+end
+
+valid_inds = find(valid);
+vacc_error = acc_vecs(:) - dout(find(valid));
+if all(vacc_error == 0)
+    fprintf('Pass\n')
+else
+    fprintf('Error!\n')
 end

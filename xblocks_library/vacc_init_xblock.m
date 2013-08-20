@@ -35,11 +35,9 @@ if use_dsp48,
     mux_latency = 0;
 end
 
-if veclen < 3,
-    errordlg('Vector Accumulator: Vector Length must be >= 2^3')
+if veclen < 2,
+    errordlg('Vector Accumulator: Vector Length must be >= 2^2')
 end
-% in_int_bits = in_bit_width - in_bin_pt;
-% out_int_bits = out_bit_width - out_bin_pt;
 
 actual_veclen = 2^veclen;
 
@@ -65,16 +63,11 @@ SyncCompare_out1 = xSignal;
 Slice_out1 = xSignal;
 Counter_out1 = xSignal;
 SliceLow_out1 = xSignal;
-% AND_out1 = xSignal;
-% Zero_out1 = xSignal;
-% acc_en = xSignal;
-% OR_out1 = xSignal;
-% SyncDelay_out1 = xSignal;
-% SyncConst_out1 = xSignal;
 
 zero = const('Zero', 0, fi_dtype(0, max_accum, 0));
 
-% TODO---is the 2 supposed to be hardcoded?
+% TODO---is the 2 supposed to be hardcoded? or should it be the bram
+% latency?
 SyncConst_out1 = const('SyncConst', actual_veclen-2, fi_dtype(0, veclen, 0));
 
 din_del = xblock_new_bus(n_inputs, 1);
@@ -106,12 +99,12 @@ ValidCompare_out1.bind(eq_comp('ValidCompare', acc_len, Slice_out1, 'latency', 1
 
 valid.bind(delay_srl('ValidDelay', ValidCompare_out1, add_latency+mux_latency));
 
+%%% TODO: pass down mux_latency properly
 vacc_core_config.source = str2func('vacc_core_init_xblock');
 vacc_core_config.name = 'vacc_core';
-%%% TODO: pass down mux_latency properly
 vacc_core_params = {'veclen', actual_veclen, 'n_inputs', n_inputs, 'arith_type', arith_type, ...
     'bit_width_out', out_bit_width, 'bin_pt_out', out_bin_pt, ...
     'add_latency', add_latency, 'bram_latency', bram_latency, ...
     'mux_latency', 0, 'bin_pt_in', in_bin_pt, 'bin_pt_out', out_bin_pt, ...
     'use_dsp48', use_dsp48 };
-xBlock(vacc_core_config, vacc_core_params, {din_del{:}, acc_en}, {dout{:,1}} );
+xBlock(vacc_core_config, vacc_core_params, {acc_en, din_del{:}}, {dout{:,1}} );
