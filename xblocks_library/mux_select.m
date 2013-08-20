@@ -8,4 +8,4 @@ selected = xSignal();
 config.source = 'Mux';
 config.name = name;
 
-xBlock(config, {'n_inputs', length(inputs)}, [{sel}, inputs], {selected});
+xBlock(config, {'inputs', length(inputs)}, [{sel}, inputs], {selected});
