@@ -1,4 +1,5 @@
 function [x_reinterp] = reinterpret(name, x, dtype, varargin)
+% [x_reinterp] = reinterpret(name, x, dtype, varargin)
 defaults = {'force_arith_type', 1, 'force_bin_pt', 1};
 force_arith_type = get_var('force_arith_type', 'defaults', defaults, varargin{:});
 force_bin_pt = get_var('force_bin_pt', 'defaults', defaults, varargin{:});
