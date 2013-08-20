@@ -6,11 +6,11 @@ bin_pt_b = get_var('bin_pt_b', 'defaults', defaults, varargin{:});
 output_dtype = fi_dtype(1, 60, bin_pt_a + bin_pt_b);
 
 %% inports
-A = xInport('In1');
-B = xInport('In2');
+A = xInport('A');
+B = xInport('B');
 
 %% outports
-AB = xOutport('Out1');
+AB = xOutport('AB');
 
 %% diagram
 DSP48E_0_p     = xSignal();
@@ -22,29 +22,30 @@ DSP48E_1_p     = xSignal();
 [opmode1, alumode1, carryin1, carryinsel1] = dsp48e_ctrl('ctrl1', '1010101', '0000', '0', '000');
 
 % Cast input data types
-A_sign_ext = trunc_and_wrap('sign_ext', A, 30, 0);
+B_int       = reinterp_int('as_type_int0', B);
+B_sign_ext = trunc_and_wrap('sign_ext', B_int, 30, 0);
 
-B_int       = reinterp_int('as_type_int', B);
-B_int_35bit = trunc_and_wrap('convert_B', B_int, 35, 0);
-B_slices    = slice_partition('B_slice', B_int_35bit, [17, 18]);
+A_int       = reinterp_int('as_type_int1', A);
+A_int_35bit = trunc_and_wrap('convert_A', A_int, 35, 0);
+A_slices    = slice_partition('A_slice', A_int_35bit, [17, 18]);
 
-B_lsb              = B_slices{1};
-B_lsb_sign_ext     = trunc_and_wrap('convert_B2', B_lsb, 18, 0);
-B_msb              = B_slices{2};
-B_msb_sign_ext     = trunc_and_wrap('covnert_B1', B_msb, 18, 0);
-B_msb_sign_ext_del = delay_srl('del1', B_msb_sign_ext, 1);
+A_lsb              = A_slices{1};
+A_lsb_sign_ext     = trunc_and_wrap('convert_A2', A_lsb, 18, 0);
+A_msb              = A_slices{2};
+A_msb_sign_ext     = trunc_and_wrap('covnert_A1', A_msb, 18, 0);
+A_msb_sign_ext_del = delay_srl('del1', A_msb_sign_ext, 1);
 
 % DSP slices
 DSP48E_0 = xBlock(struct('source', 'DSP48E', 'name', 'DSP48E_0'), ...
     struct('use_acout', 'on', 'use_pcout', 'on', 'pipeline_a', '2', ...
         'pipeline_b', '2'), ...
-    {A_sign_ext, B_lsb_sign_ext, opmode0, alumode0, carryin0, carryinsel0}, ...
+    {B_sign_ext, A_lsb_sign_ext, opmode0, alumode0, carryin0, carryinsel0}, ...
     {DSP48E_0_p, DSP48E_0_acout, DSP48E_0_pcout});
 
 DSP48E_1 = xBlock(struct('source', 'DSP48E', 'name', 'DSP48E_1'), ...
     struct('use_a', 'Cascaded from ACIN Port', 'use_pcin', 'on', ...
         'pipeline_a', '2', 'pipeline_b', '2'), ...
-    {DSP48E_0_acout, B_msb_sign_ext_del, DSP48E_0_pcout, opmode1, alumode1, carryin1, carryinsel1}, ...
+    {DSP48E_0_acout, A_msb_sign_ext_del, DSP48E_0_pcout, opmode1, alumode1, carryin1, carryinsel1}, ...
     {DSP48E_1_p});
 
 % Cast output data types
