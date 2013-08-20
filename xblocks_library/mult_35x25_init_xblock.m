@@ -1,6 +1,7 @@
 function mult_35x25_init_xblock(blk, varargin)
 %% config
-defaults = {};
+defaults = {'bin_pt', 0};
+bin_pt = get_var('bin_pt', 'defaults', defaults, varargin{:});
 
 %% inports
 A = xInport('In1');
@@ -12,15 +13,15 @@ AB = xOutport('Out1');
 %% diagram
 % reinterp_concat_1_out1 = xSignal();
 % pipe_del3_out1         = xSignal();
-Concat_out1            = xSignal();
+AB_int            = xSignal();
 % Convert1_out1          = xSignal();
-B_lsb_sign_ext        = xSignal();
+% B_lsb_sign_ext        = xSignal();
 DSP48E_0_p          = xSignal();
 DSP48E_0_acout          = xSignal();
 DSP48E_0_pcout          = xSignal();
-pipe_del2_out1         = xSignal();
+% pipe_del2_out1         = xSignal();
 DSP48E_1_p          = xSignal();
-covnert_B_out1         = xSignal();
+% covnert_B_out1         = xSignal();
 B_msb             = xSignal();
 B_lsb            = xSignal();
 prod_lsb            = xSignal();
@@ -34,8 +35,6 @@ B_msb_sign_ext        = xSignal();
 
 reinterp_B_out1 = reinterp_int('reinterp_B', B);
 A_sign_ext = trunc_and_wrap('Convert1', A, 30, 0);
-
-
 
 % block: mult_35x25/mult_35x25_init_xblock/covnert_B
 covnert_B_out1 = trunc_and_wrap('convert_B', reinterp_B_out1, 35, 0);
@@ -81,24 +80,14 @@ covnert_B1 = xBlock(struct('source', 'Convert', 'name', 'covnert_B1'), ...
     {B_msb}, ...
     {B_msb_sign_ext});
 
-% block: mult_35x25/mult_35x25_init_xblock/covnert_B2
-% covnert_B2 = xBlock(struct('source', 'Convert', 'name', 'covnert_B2'), ...
-%     struct('n_bits', 18, ...
-%     'bin_pt', 0), ...
-%     {B_lsb}, ...
-%     {B_lsb_sign_ext});
-
 B_lsb_sign_ext = trunc_and_wrap('convert_B2', B_lsb, 18, 0);
 
 % block: mult_35x25/mult_35x25_init_xblock/pipe_del2
-pipe_del2 = xBlock(struct('source', 'Register', 'name', 'pipe_del2'), ...
-    [], ...
-    {B_msb_sign_ext}, ...
-    {pipe_del2_out1});
-
-
-
-
+pipe_del2_out1 = delay_srl('pipe_del2', B_msb_sign_ext, 1);
+% pipe_del2 = xBlock(struct('source', 'Register', 'name', 'pipe_del2'), ...
+%     [], ...
+%     {B_msb_sign_ext}, ...
+%     {pipe_del2_out1});
 
 % block: mult_35x25/mult_35x25_init_xblock/DSP48E_0
 DSP48E_0 = xBlock(struct('source', 'DSP48E', 'name', 'DSP48E_0'), ...
@@ -128,17 +117,17 @@ pipe_del3_out1 = delay_srl('del2', reinterp_concat_0_out1, 1);
 reinterp_concat_1_out1 = reinterp_uint('reinterp_concat_1', prod_msb);
 
 % block: mult_35x25/mult_35x25_init_xblock/Concat
-Concat = xBlock(struct('source', 'Concat', 'name', 'Concat'), ...
-    [], ...
-    {reinterp_concat_1_out1, pipe_del3_out1}, ...
-    {Concat_out1});
-
+% Concat = xBlock(struct('source', 'Concat', 'name', 'Concat'), ...
+%     [], ...
+%     {reinterp_concat_1_out1, pipe_del3_out1}, ...
+%     {AB_int});
+AB_int = concatenate('concat', {reinterp_concat_1_out1, pipe_del3_out1});
 % block: mult_35x25/mult_35x25_init_xblock/reinterp_concat_2
-reinterp_concat_2 = xBlock(struct('source', 'Reinterpret', 'name', 'reinterp_concat_2'), ...
-    struct('force_arith_type', 'on', ...
-    'arith_type', 'Signed  (2''s comp)', ...
-    'force_bin_pt', 'on'), ...
-    {Concat_out1}, ...
-    {AB});
-
-
+% reinterp_concat_2 = xBlock(struct('source', 'Reinterpret', 'name', 'reinterp_concat_2'), ...
+%     struct('force_arith_type', 'on', ...
+%     'arith_type', 'Signed  (2''s comp)', ...
+%     'force_bin_pt', 'on'), ...
+%     {Concat_out1}, ...
+%     {AB});
+AB_sig = reinterpret('reinterp_concat_2', AB_int, fi_dtype(1, 60, bin_pt));
+AB.bind(AB_sig);
