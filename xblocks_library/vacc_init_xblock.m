@@ -35,8 +35,8 @@ if use_dsp48,
     mux_latency = 0;
 end
 
-if veclen < 2,
-    errordlg('Vector Accumulator: Vector Length must be >= 2^2')
+if veclen < 0,
+    errordlg('Vector Accumulator: Vector Length must be >= 2^0')
 end
 
 actual_veclen = 2^veclen;
@@ -66,18 +66,15 @@ SliceLow_out1 = xSignal;
 
 zero = const('Zero', 0, fi_dtype(0, max_accum, 0));
 
-% TODO---is the 2 supposed to be hardcoded? or should it be the bram
-% latency?
-SyncConst_out1 = const('SyncConst', actual_veclen-2, fi_dtype(0, veclen, 0));
-
 din_del = xblock_new_bus(n_inputs, 1);
+
 xblock_delay(din, din_del', 'din', mux_latency+1, 'Register');
 
-AND_out1 = and_gate('AND', ValidCompare_out1, SyncCompare_out1);
+end_of_frame = and_gate('AND', ValidCompare_out1, SyncCompare_out1);
 
 acc_en = neq_comp('AccEnCompare', Slice_out1, zero, 'latency', 1);
 
-counter_rst = or_gate('OR', sync, AND_out1);
+counter_rst = or_gate('OR', sync, end_of_frame);
 
 Counter = xBlock(struct('source', 'Counter', 'name', 'Counter'), ...
     struct('n_bits', max_accum + veclen, 'rst', 'on', 'use_rpm', 'on'), ...
@@ -88,16 +85,21 @@ Slice = xBlock(struct('source', 'Slice', 'name', 'Slice'), ...
     struct('nbits', max_accum, 'mode', 'Upper Bit Location + Width'), ...
     {Counter_out1}, {Slice_out1});
 
-% block: untitled1/vacc_init_xblock/SliceLow
-SliceLow = xBlock(struct('source', 'Slice', 'name', 'SliceLow'), ...
-    struct('nbits', veclen, 'mode', 'Lower Bit Location + Width'), ...
-    {Counter_out1}, {SliceLow_out1});
+if veclen > 0
+    SliceLow = xBlock(struct('source', 'Slice', 'name', 'SliceLow'), ...
+        struct('nbits', veclen, 'mode', 'Lower Bit Location + Width'), ...
+        {Counter_out1}, {SliceLow_out1});
 
-SyncCompare_out1.bind(eq_comp('SyncCompare', SliceLow_out1, SyncConst_out1, 'latency', 1));
+    sync_const = const('SyncConst', actual_veclen-2, fi_dtype(0, veclen, 0));
+    SyncCompare_out1.bind(eq_comp('SyncCompare', SliceLow_out1, sync_const, 'latency', 1));
+    ValidCompare_out1.bind(eq_comp('ValidCompare', acc_len, Slice_out1, 'latency', 1));
+    valid.bind(delay_srl('ValidDelay', ValidCompare_out1, add_latency+mux_latency));
+else
+    SyncCompare_out1.bind(bool_one('end_of_vec'));
+    ValidCompare_out1.bind(eq_comp('ValidCompare', acc_len, Slice_out1, 'latency', 0));
+    valid.bind(delay_srl('ValidDelay', ValidCompare_out1, add_latency+mux_latency+1));
+end
 
-ValidCompare_out1.bind(eq_comp('ValidCompare', acc_len, Slice_out1, 'latency', 1));
-
-valid.bind(delay_srl('ValidDelay', ValidCompare_out1, add_latency+mux_latency));
 
 %%% TODO: pass down mux_latency properly
 vacc_core_config.source = str2func('vacc_core_init_xblock');

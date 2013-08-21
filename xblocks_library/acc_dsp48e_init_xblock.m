@@ -14,8 +14,8 @@ else
 end
 
 %% inports
-x = xInport('x');
 en = xInport('en');
+x = xInport('x');
 
 %% outports
 sum_x = xOutport('sum_x');

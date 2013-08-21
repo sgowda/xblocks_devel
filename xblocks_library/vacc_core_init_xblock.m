@@ -40,33 +40,44 @@ dout = xblock_new_outputs('dout', n_inputs, 1);
 del_bram_in = xblock_new_bus(n_inputs, 1);
 din_del = xblock_new_bus(n_inputs, 1);
 
-% adder
-for k=1:n_inputs
-    add_en_config.source = str2func('add_en_init_xblock');
-    add_en_config.name = ['adder_with_enable_', num2str(k)];
-    add_en_params = {'bin_pt_din0', bin_pt_in, 'bin_pt_din1', bin_pt_in, ...
-        'bit_width_out', bit_width_out, 'bin_pt_out', bin_pt_out, 'arith_type', arith_type, ...
-        'use_dsp48', use_dsp48, 'add_latency', add_latency, 'mux_latency', mux_latency};
-    xBlock( add_en_config, add_en_params, {din{k,1}, din_del{k}, acc_en}, del_bram_in(k));
-
-    dout{k,1}.bind( del_bram_in{k} );
-end
-
-% memory
-delay_bram_config.source = str2func('delay_bram_init_xblock');
-delay_bram_config.name = ['acc_mem',num2str(k)];
-bram_delay = veclen-add_latency-mux_latency;
-
-if bram_delay <= bram_latency % implement using SRLs
-    for k=1:n_inputs
-        din_del{k}.bind(delay_srl(sprintf('acc_mem_%d', k), del_bram_in{k}, bram_delay));
+if (veclen == 1) && use_dsp48
+    for k = 1:n_inputs
+        config.source = @acc_dsp48e_init_xblock;
+        config.name = sprintf('acc_%d', k);
+        xBlock(config, {[], 'bin_pt', bin_pt_in}, {acc_en, din{k}}, {dout{k}}); % TODO input bit widht, input bin pt
     end
+elseif (veclen == 1)
+    error('Veclen == 1 requires DSP48E accumulators!')
 else
-    delay_bram_params = {[], 'latency', bram_delay, 'bram_latency', bram_latency, ...
-        'n_inputs', n_inputs};
-    xBlock(delay_bram_config, delay_bram_params, del_bram_in, din_del);
+    % adder
+    for k=1:n_inputs
+        add_en_config.source = str2func('add_en_init_xblock');
+        add_en_config.name = ['adder_with_enable_', num2str(k)];
+        add_en_params = {'bin_pt_din0', bin_pt_in, 'bin_pt_din1', bin_pt_in, ...
+            'bit_width_out', bit_width_out, 'bin_pt_out', bin_pt_out, 'arith_type', arith_type, ...
+            'use_dsp48', use_dsp48, 'add_latency', add_latency, 'mux_latency', mux_latency};
+        xBlock( add_en_config, add_en_params, {din{k,1}, din_del{k}, acc_en}, del_bram_in(k));
+
+        dout{k,1}.bind( del_bram_in{k} );
+    end
+
+    % memory
+    delay_bram_config.source = str2func('delay_bram_init_xblock');
+    delay_bram_config.name = ['acc_mem',num2str(k)];
+    bram_delay = veclen-add_latency-mux_latency;
+
+    if bram_delay < 0
+        error('vacc_core: add latency + mux latency is too long!');
+    elseif bram_delay <= bram_latency % implement using SRLs
+        for k=1:n_inputs
+            din_del{k}.bind(delay_srl(sprintf('acc_mem_%d', k), del_bram_in{k}, bram_delay));
+        end
+    else
+        delay_bram_params = {[], 'latency', bram_delay, 'bram_latency', bram_latency, ...
+            'n_inputs', n_inputs};
+        xBlock(delay_bram_config, delay_bram_params, del_bram_in, din_del);
+    end
 end
-   
 
 end
 
