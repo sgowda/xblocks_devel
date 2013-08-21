@@ -1,4 +1,5 @@
 function [x] = bool_one(name)
+% [x] = bool_one(name)
 
 x = xSignal();
 xBlock(struct('source', 'Constant', 'name', name), {'const', 1, ...
