@@ -6,32 +6,37 @@ pulse_len = get_var('pulse_len', 'defaults', defaults, varargin{:});
 n_bits = ceil(log2(pulse_len)) + 1;
 
 %% inports
-ld = xInport('ld');
+sync = xInport('sync');
 
 %% outports
-shift = xOutport('shift');
+pulse = xOutport('pulse');
 
 %% diagram
-Relational2_out1 = xSignal('Relational2_out1');
-Relational1_out1 = xSignal('Relational1_out1');
-Relational_out1 = xSignal('Relational_out1');
+count_less_than_max = xSignal();
+count_greater_than_1 = xSignal();
+count_less_than_pulse_len = xSignal();
+count = xSignal();
 
-Constant10_out1 = const('Constant10', pulse_len, fi_dtype(0, n_bits, 0));
-Constant8_out1 = const('Constant8', 2^n_bits-1, fi_dtype(0, n_bits, 0));
-Constant9_out1 = const('Constant9', 1, fi_dtype(0, n_bits, 0));
+% comparison constants
+pulse_len = const('Constant10', pulse_len, fi_dtype(0, n_bits, 0));
+counter_max = const('Constant8', 2^n_bits-1, fi_dtype(0, n_bits, 0));
+one = const('Constant9', 1, fi_dtype(0, n_bits, 0));
 
-Logical1_out1 = or_gate('or', ld, Relational_out1);
+% counter enable
+sync_latch = latch('sync_latch', sync);
+en = or_gate('or', sync, count_less_than_max);
+count_en = and_gate('and1', sync_latch, en);
 
-Counter_out1 = xSignal('Counter_out1');
-Counter = xBlock(struct('source', 'Counter', 'name', 'Counter'), ...
-    struct('n_bits', 4, ...
-    'rst', 'on', ...
-    'en', 'on'), ...
-    {ld, Logical1_out1}, ...
-    {Counter_out1});
+% counter
+xBlock(struct('source', 'Counter', 'name', 'Counter'), ...
+    struct('n_bits', n_bits, 'rst', 'on', 'en', 'on'), ...
+    {sync, count_en}, {count});
 
-shift.bind(and_gate('and', Relational2_out1, Relational1_out1));
-Relational_out1.bind(lt_comp('Relational', Counter_out1, Constant8_out1, 'latency', 0));
-Relational1_out1.bind(le_comp('Relational1', Counter_out1, Constant10_out1, 'latency', 0));
-Relational2_out1.bind(ge_comp('Relational2', Counter_out1, Constant9_out1, 'latency', 0));
+% comparators
+count_less_than_max.bind(lt_comp('Relational', count, counter_max, 'latency', 0));
+count_less_than_pulse_len.bind(le_comp('Relational1', count, pulse_len, 'latency', 0));
+count_greater_than_1.bind(ge_comp('Relational2', count, one, 'latency', 0));
+
+% output
+pulse.bind(and_gate('and', count_greater_than_1, count_less_than_pulse_len));
 end
