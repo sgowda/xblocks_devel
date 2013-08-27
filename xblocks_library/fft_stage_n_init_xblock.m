@@ -63,6 +63,7 @@ FFTStage = get_var('FFTStage', 'defaults', defaults, varargin{:});
 input_bit_width = get_var('input_bit_width', 'defaults', defaults, varargin{:});
 coeff_bit_width = get_var('coeff_bit_width', 'defaults', defaults, varargin{:});
 coeffs_bram = get_var('coeffs_bram', 'defaults', defaults, varargin{:});
+use_bram = strcmp(coeffs_bram, 'on');
 delays_bram = get_var('delays_bram', 'defaults', defaults, varargin{:});
 quantization = get_var('quantization', 'defaults', defaults, varargin{:});
 overflow = get_var('overflow', 'defaults', defaults, varargin{:});
@@ -246,7 +247,8 @@ xBlock(struct('source', 'Delay', 'name', 'b_coeff_delay'), ...
 
 % Coefficient generator
 xBlock(struct('source', str2func('coeff_gen_init_xblock'), 'name', 'coeff_gen'), ...
-    {[], ActualCoeffs, coeff_bit_width, StepPeriod, bram_latency, coeffs_bram}, ...
+    {[], 'Coeffs', ActualCoeffs, 'coeff_bit_width', coeff_bit_width, ...
+        'StepPeriod', StepPeriod, 'bram_latency', bram_latency, 'use_bram', use_bram}, ...
     {sync_delay_out1}, {w});
                            
 % Implement delays using fabric or BRAM
