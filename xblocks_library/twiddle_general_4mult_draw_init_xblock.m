@@ -27,7 +27,7 @@ function twiddle_general_4mult_draw_init_xblock(a_re, a_im, b_re, b_im, w_re, w_
 
 
 %depends =
-%{'coeff_gen_init_xblock','cmult_dsp48e_init_xblock','c_to_ri_init_xblock',
+%{'coeff_gen_init_xblock','c_to_ri_init_xblock',
 %'tap_multiply_fabric_init_xblock'}
 
 %% diagram
@@ -35,8 +35,6 @@ function twiddle_general_4mult_draw_init_xblock(a_re, a_im, b_re, b_im, w_re, w_
 b_re_del = xSignal;
 b_im_del = xSignal;
 w = xSignal;
-% w_re = xSignal;
-% w_im = xSignal;
 
 mult_out1 = xSignal;
 mult1_out1 = xSignal;
@@ -61,22 +59,6 @@ a_im_delay = xBlock(struct('source', 'Delay', 'name', 'a_im_delay'), ...
 % delay b_re by bram_latency
 b_re_del = b_re;
 b_im_del = b_im;
-% b_re_delay = xBlock(struct('source', 'Delay', 'name', 'b_re_delay'), ...
-%     struct('latency', bram_latency, 'reg_retiming', 'on'), {b_re}, {b_re_del});
-% 
-% % delay b_im by bram_latency
-% b_im_delay = xBlock(struct('source', 'Delay', 'name', 'b_im_delay'), ...
-%     struct('latency', bram_latency, 'reg_retiming', 'on'), {b_im}, {b_im_del});
-
-% instantiate coefficient generator
-
-
-% split w into real/imag
-% c_to_ri_w = xBlock(struct('source', str2func('c_to_ri_init_xblock'), 'name', 'c_to_ri_w'), ...
-%                             {[], ...
-%                             coeff_bit_width, ...
-%                             coeff_bit_width-2}, ...  % note this is -2
-%                          {w}, {w_re, w_im});
 
 mults = xBlock(struct('source', str2func('tap_multiply_fabric_init_xblock'), 'name', 'mults'), ...
     {[], input_bit_width, input_bit_width-1, coeff_bit_width, ...
