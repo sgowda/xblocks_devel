@@ -19,7 +19,7 @@
 %   51 Franklin Street, Fifth Floor, Boston, MA 02110-1301 USA.               %
 %                                                                             %
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-function cmult_behav_init_xblock2(blk, varargin)
+function cmult_behav_init_xblock(blk, varargin)
 
 defaults = {'n_bits_a', 18, 'bin_pt_a', 17, 'n_bits_b', 18, 'bin_pt_b', 17, 'conjugated', 0, ...
 	'full_precision', 1, 'n_bits_c', 18, 'bin_pt_c', 17, 'quantization', 'Truncate', 'overflow', 'Wrap', ...
