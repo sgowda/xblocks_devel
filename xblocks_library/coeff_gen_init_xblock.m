@@ -19,7 +19,13 @@
 %   51 Franklin Street, Fifth Floor, Boston, MA 02110-1301 USA.               %
 %                                                                             %
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-function coeff_gen_init_xblock(blk, Coeffs, coeff_bit_width, StepPeriod, bram_latency, coeffs_bram)
+function coeff_gen_init_xblock(blk, varargin)
+defaults = {'Coeffs', [], 'coeff_bit_width', 18, 'StepPeriod', 0, 'bram_latency', 2, 'use_bram', 1};
+Coeffs = get_var('Coeffs', 'defaults', defaults, varargin{:});
+coeff_bit_width = get_var('coeff_bit_width', 'defaults', defaults, varargin{:});
+StepPeriod = get_var('StepPeriod', 'defaults', defaults, varargin{:});
+bram_latency = get_var('bram_latency', 'defaults', defaults, varargin{:});
+use_bram = get_var('use_bram', 'defaults', defaults, varargin{:});
 
 single_rom_size = 1024; %% May be architecture specific.  1024 is the V5 limit
 
@@ -29,7 +35,6 @@ if( ~isempty(find(real(Coeffs) > 1, 1)) || ~isempty(find(imag(Coeffs) > 1, 1)) )
     clog(['coeff_gen_init: [',num2str(Coeffs,4),'] not all in range [-1->1]'],'error');
     error('coeff_gen_init: Coefficients specified are out of range');
 end
-use_bram = strcmp(coeffs_bram, 'on');
 
 %% inports
 rst = xInport('rst');
