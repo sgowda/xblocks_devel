@@ -19,15 +19,27 @@
 %   51 Franklin Street, Fifth Floor, Boston, MA 02110-1301 USA.               %
 %                                                                             %
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-function cmult_dsp48e_init_xblock(blk, n_bits_a, bin_pt_a, n_bits_b, bin_pt_b, conjugated, ...
-	full_precision, n_bits_c, bin_pt_c, quantization, overflow, cast_latency, varargin)
+function cmult_dsp48e_init_xblock(blk, varargin)
+defaults = {'n_bits_a', 18, 'bin_pt_a', 17, 'n_bits_b', 18, 'bin_pt_b', 17, 'conjugated', 0, ...
+	'full_precision', 1, 'n_bits_c', 18, 'bin_pt_c', 17, 'quantization', 'Truncate', 'overflow', 'Wrap', ...
+    'cplx_inputs', 0, 'mult_latency', 3, 'add_latency', 2, 'conv_latency', 1};
 
-
-defaults = {'cplx_inputs', 0};
+n_bits_a = get_var('n_bits_a', 'defaults', defaults, varargin{:});
+n_bits_b = get_var('n_bits_b', 'defaults', defaults, varargin{:});
+n_bits_c = get_var('n_bits_c', 'defaults', defaults, varargin{:});
+bin_pt_a = get_var('bin_pt_a', 'defaults', defaults, varargin{:});
+bin_pt_b = get_var('bin_pt_b', 'defaults', defaults, varargin{:});
+bin_pt_c = get_var('bin_pt_c', 'defaults', defaults, varargin{:});
+conjugated = get_var('conjugated', 'defaults', defaults, varargin{:});
+full_precision = get_var('full_precision', 'defaults', defaults, varargin{:});
+quantization = get_var('quantization', 'defaults', defaults, varargin{:});
+overflow = get_var('overflow', 'defaults', defaults, varargin{:});
 cplx_inputs = get_var('cplx_inputs', 'defaults', defaults, varargin{:});
+mult_latency = get_var('mult_latency', 'defaults', defaults, varargin{:});
+add_latency = get_var('add_latency', 'defaults', defaults, varargin{:});
+conv_latency = get_var('conv_latency', 'defaults', defaults, varargin{:});
 
 % Validate input fields.
-% Initialization script
 if (n_bits_a < 1),
 	disp([gcb,': Input ''a'' bit width must be greater than 0.']);
 	return
@@ -84,18 +96,17 @@ if (bin_pt_c > n_bits_c),
 end
 
 bin_pt_reinterp = bin_pt_a + bin_pt_b;
-if strcmp(full_precision, 'on'),
-  n_bits_out = n_bits_a + n_bits_b + 1;
-  bin_pt_out = bin_pt_a + bin_pt_b;
+if full_precision
+    n_bits_out = n_bits_a + n_bits_b + 1;
+    bin_pt_out = bin_pt_a + bin_pt_b;
 else
-  n_bits_out = n_bits_c;
-  bin_pt_out = bin_pt_c;
+    n_bits_out = n_bits_c;
+    bin_pt_out = bin_pt_c;
 end
 
 
 % Set conjugation mode.
-
-if strcmp(conjugated, 'on'),
+if conjugated,
     alumode1_val = 1;
     carryin1_val = 1;
     alumode3_val = 0;
@@ -385,7 +396,7 @@ reinterp_c_im_out1 = xSignal;
 cast_c_im = xBlock(struct('source', 'Convert', 'name', 'cast_c_im'), ...
                           struct('n_bits', n_bits_out, ...
                                  'bin_pt', bin_pt_out, ...
-                                 'latency', cast_latency, ...
+                                 'latency', conv_latency, ...
                                  'quantization', quantization, 'overflow', overflow, ...
                                  'pipeline', 'on'), ...
                           {reinterp_c_im_out1}, ...
@@ -396,7 +407,7 @@ reinterp_c_re_out1 = xSignal;
 cast_c_re = xBlock(struct('source', 'Convert', 'name', 'cast_c_re'), ...
                           struct('n_bits', n_bits_out, ...
                                  'bin_pt', bin_pt_out, ...
-                                 'latency', cast_latency, ...
+                                 'latency', conv_latency, ...
                                  'quantization', quantization, 'overflow', overflow, ...
                                  'pipeline', 'on'), ...
                           {reinterp_c_re_out1}, ...
@@ -530,10 +541,10 @@ if ~isempty(blk) && strcmp(blk(1),'/')
     % Set attribute format string (block annotation).
     annotation_fmt = '%d_%d * %d_%d ==> %d_%d\nLatency=%d';
     annotation = sprintf(annotation_fmt, ...
-      n_bits_a, bin_pt_a, ...
-      n_bits_b, bin_pt_b, ...
-      n_bits_out, bin_pt_out, ...
-      4+cast_latency);
+        n_bits_a, bin_pt_a, ...
+        n_bits_b, bin_pt_b, ...
+        n_bits_out, bin_pt_out, ...
+        4+conv_latency);
     set_param(blk, 'AttributesFormatString', annotation);
 end
 
