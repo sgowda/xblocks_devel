@@ -24,9 +24,13 @@ mux_latency = get_var('mux_latency', 'defaults', defaults, varargin{:});
 bin_pt_in = get_var('bin_pt_in', 'defaults', defaults, varargin{:});
 use_dsp48 = get_var('use_dsp48', 'defaults', defaults, varargin{:});
 
-% Hard coded add latency for dsp48 implementation mode
-if use_dsp48
-	add_latency = 2; 
+% Add latency is fixed for dsp48 implementation mode
+if use_dsp48 && bit_width_out < 48
+    add_latency = 2; 
+elseif use_dsp48 && bit_width_out < 96
+    add_latency = 3;	
+elseif use_dsp48
+    error('bit width too large for currently-implemented DSP48E adders')
 end
 
 %% inports
@@ -41,22 +45,35 @@ del_bram_in = xblock_new_bus(n_inputs, 1);
 din_del = xblock_new_bus(n_inputs, 1);
 
 if (veclen == 1) && use_dsp48
+    acc_params = {[], 'bin_pt', bin_pt_in, 'input_bit_width', bit_width_out, 'max_accum', 0};
+%     acc_params = {[], 'bin_pt', bin_pt_in};
     for k = 1:n_inputs
         config.source = @acc_dsp48e_init_xblock;
         config.name = sprintf('acc_%d', k);
-        xBlock(config, {[], 'bin_pt', bin_pt_in}, {acc_en, din{k}}, {dout{k}}); % TODO input bit widht, input bin pt
+        xBlock(config, acc_params, {acc_en, din{k}}, {dout{k}});
     end
 elseif (veclen == 1)
     error('Veclen == 1 requires DSP48E accumulators!')
 else
     % adder
-    for k=1:n_inputs
+    if use_dsp48
+        add_en_config.source = @addsub_96bit_dsp48e_init_xblock;
+        add_en_params = {[], 'bit_width_a', bit_width_out-1, 'bin_pt_a', bin_pt_out, ...
+            'bit_width_b', bit_width_out-1, 'bin_pt_b', bin_pt_out, ...
+            'mode', 'Addition', 'use_en', 1};
+    else
         add_en_config.source = str2func('add_en_init_xblock');
-        add_en_config.name = ['adder_with_enable_', num2str(k)];
         add_en_params = {'bin_pt_din0', bin_pt_in, 'bin_pt_din1', bin_pt_in, ...
-            'bit_width_out', bit_width_out, 'bin_pt_out', bin_pt_out, 'arith_type', arith_type, ...
-            'use_dsp48', use_dsp48, 'add_latency', add_latency, 'mux_latency', mux_latency};
-        xBlock( add_en_config, add_en_params, {din{k,1}, din_del{k}, acc_en}, del_bram_in(k));
+            'bit_width_out', bit_width_out, 'bin_pt_out', bin_pt_out, ...
+            'arith_type', arith_type, ...
+            'use_dsp48', use_dsp48, 'add_latency', add_latency, ...
+            'mux_latency', mux_latency};        
+    end
+    
+    for k=1:n_inputs
+        add_en_config.name = ['adder_with_enable_', num2str(k)];       
+        xBlock(add_en_config, add_en_params, {din{k,1}, din_del{k}, acc_en}, ...
+            del_bram_in(k));
 
         dout{k,1}.bind( del_bram_in{k} );
     end
