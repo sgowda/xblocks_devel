@@ -10,11 +10,11 @@ mode = get_var('mode', 'defaults', defaults, varargin{:});
 use_en = get_var('use_en', 'defaults', defaults, varargin{:});
 
 %% Inports
+a = xInport('a');
+b = xInport('b');
 if use_en
     en = xInport('en');
 end
-a = xInport('a');
-b = xInport('b');
 
 %% Outports
 if strcmp(mode, 'Addition')
@@ -44,10 +44,10 @@ end
 %% Diagram
 if use_48bit
     if use_en
-        % TODO opmode might switch the incorrect input to 0
+        % switch AB input to 0
         [add_opmode0, alumode0, carryin0, carryinsel0] = dsp48e_ctrl('ctrl0', '0110011', alumode_str, '0', '000');
-        rst_opmode0 = const('rst_optmode0', bin2dec('0000011'), fi_dtype(0, 7, 0));
-        opmode0 = mux_select('sel_op0', en, {add_opmode0, rst_opmode0});
+        rst_opmode0 = const('rst_optmode0', bin2dec('0110000'), fi_dtype(0, 7, 0));
+        opmode0 = mux_select('sel_op0', en, {rst_opmode0, add_opmode0});
     else
         [opmode0, alumode0, carryin0, carryinsel0] = dsp48e_ctrl('ctrl0', '0110011', alumode_str, '0', '000');
     end
@@ -82,13 +82,13 @@ if use_48bit
     out.bind(sum_sig);    
 elseif use_96bit
     if use_en
-        % TODO opmode might switch the incorrect input to 0
+        % switch AB input to 0
         [add_opmode0, alumode0, carryin0, carryinsel0] = dsp48e_ctrl('ctrl0', '0110011', alumode_str, '0', '000');
         [add_opmode1, alumode1, carryin1, carryinsel1] = dsp48e_ctrl('ctrl1', '0110011', alumode_str, '0', '010');    
-        rst_opmode0 = const('rst_optmode0', bin2dec('0000011'), fi_dtype(0, 7, 0));
-        rst_opmode1 = const('rst_optmode0', bin2dec('0000011'), fi_dtype(0, 7, 0));
-        opmode0 = mux_select('sel_op0', en, {add_opmode0, rst_opmode0});
-        opmode1 = mux_select('sel_op0', en, {add_opmode1, rst_opmode1});
+        rst_opmode0 = const('rst_optmode0', bin2dec('0110000'), fi_dtype(0, 7, 0));
+        rst_opmode1 = const('rst_optmode1', bin2dec('0110000'), fi_dtype(0, 7, 0));
+        opmode0 = mux_select('sel_op0', en, {rst_opmode0, add_opmode0});
+        opmode1 = mux_select('sel_op1', en, {rst_opmode1, add_opmode1}, 'latency', 1);
     else
         [opmode0, alumode0, carryin0, carryinsel0] = dsp48e_ctrl('ctrl0', '0110011', alumode_str, '0', '000');
         [opmode1, alumode1, carryin1, carryinsel1] = dsp48e_ctrl('ctrl1', '0110011', alumode_str, '0', '010');
