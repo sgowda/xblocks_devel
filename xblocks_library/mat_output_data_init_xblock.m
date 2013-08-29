@@ -17,7 +17,7 @@ output.bind(input);
 %% diagram
 to_workspace_input = xSignal();
 xBlock( struct('source', 'simulink/Sinks/To Workspace', 'name', 'workspace_input'), ...
-    {'VariableName', var_name, 'SaveFormat', SaveFormat}, {to_workspace_input}, {});
+    {'VariableName', var_name, 'SaveFormat', SaveFormat, 'FixptAsFi', 'on'}, {to_workspace_input}, {});
 
 xSignal('Gateway_Out_out1');
 xBlock(struct('source', 'Gateway Out', 'name', 'gateway'), ...
