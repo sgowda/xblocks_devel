@@ -18,5 +18,5 @@ else
     
     bConcat = xBlock(struct('source', 'Concat', 'name', name), ...
         struct('num_inputs', concatSize), ...
-        sIn, {sOut});
+        {sIn{:}}, {sOut});
 end
