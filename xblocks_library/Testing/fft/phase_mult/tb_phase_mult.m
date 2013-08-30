@@ -10,8 +10,7 @@ biplex_fft_length = 64;
 config.source = str2func('phase_mult_init_xblock');
 config.toplevel = sprintf('%s/phase_mult', mdl_name);
 xBlock(config, {config.toplevel, 'n_inputs', n_inputs, ...
-    'biplex_fft_length', biplex_fft_length, 'overflow', 'Saturate', ...
-    'quantization', 'Round  (unbiased: +/- Inf)'});
+    'biplex_fft_length', biplex_fft_length, 'cmult_impl', 'dsp48e'});
 
 %% Generate input data
 T_sim = 200;
@@ -43,7 +42,7 @@ set_param(mdl_name, 'StopTime', num2str(T_sim-1));
 sim(mdl_name)
 
 %% Verify
-output_start = find(sync_out) + 1;
+output_start = find(double(sync_out)) + 1;
 
 output_data = [out1.'; out2.'; out3.'; out4.'; out5.'; out6.'; out7.'; out8.';
     out9.'; out10.'; out11.'; out12.'; out13.'; out14.'; out15.'; out16.';];

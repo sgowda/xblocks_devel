@@ -48,7 +48,7 @@ set_param(mdl_name, 'StopTime', num2str(T_sim-1));
 sim(mdl_name)
 
 %% Verify
-output_start = find(sync_out) + 1;
+output_start = find(double(sync_out)) + 1;
 
 output_data = [out1.'; out2.'; out3.'; out4.'];
 % out5.'; out6.'; out7.'; out8.';

@@ -38,34 +38,34 @@ set_param(mdl_name, 'StopTime', num2str(T_sim-1));
 sim(mdl_name)
 
 %% Verify accumulator outputs
-fprintf('# of sync outs correct: %d\n', length(find(sync_out_acc)) == n_vecs);
-sync_out_inds = find(sync_out_acc);
+fprintf('# of sync outs correct: %d\n', length(find(double(acc_valid))) == n_vecs);
+acc_valid_inds = find(double(acc_valid));
 
-X_acc = X_re_acc + 1j*X_im_acc;
-X_sq_acc = X_sq_re_acc + 1j*X_sq_im_acc;
-X_cube_acc = X_3rd_pow_re_acc + 1j*X_3rd_pow_im_acc;
+X_mean = X_re_mean + 1j*X_im_mean;
+X_sq_mean = X_sq_re_mean + 1j*X_sq_im_mean;
+X_cube_mean = X_3rd_pow_re_mean + 1j*X_3rd_pow_im_mean;
 
-X_acc_error = zeros(1, n_vecs);
-X_sq_acc_error = zeros(1, n_vecs);
-X_cube_acc_error = zeros(1, n_vecs);
-abs_X_sq_acc_error = zeros(1, n_vecs);
-abs_X_4th_acc_error = zeros(1, n_vecs);
+X_mean_error = zeros(1, n_vecs);
+X_sq_mean_error = zeros(1, n_vecs);
+X_cube_mean_error = zeros(1, n_vecs);
+abs_X_sq_mean_error = zeros(1, n_vecs);
+abs_X_4th_mean_error = zeros(1, n_vecs);
 
 for k=1:n_vecs
-    start = sync_out_inds(k) + 1;
+    start = acc_valid_inds(k);
     fi_data = X_fi(vec_len*(k-1)+2:vec_len*k+1);
-    X_acc_error(k) = sum(fi_data) - X_acc(start);
-    X_sq_acc_error(k) = sum(fi_data.^2) - X_sq_acc(start);
-    X_cube_acc_error(k) = sum(fi_data .* abs(fi_data).^2) - X_cube_acc(start);
-    abs_X_sq_acc_error(k) = sum(abs(fi_data).^2) - abs_X_sq_acc(start);
-    abs_X_4th_acc_error(k) = sum(abs(fi_data).^4) - abs_X_4th_power_acc(start);
+    X_mean_error(k) = mean(fi_data) - X_mean(start);
+    X_sq_mean_error(k) = mean(fi_data.^2) - X_sq_mean(start);
+    X_cube_mean_error(k) = mean(fi_data .* abs(fi_data).^2) - X_cube_mean(start);
+    abs_X_sq_mean_error(k) = mean(abs(fi_data).^2) - abs_X_sq_mean(start);
+    abs_X_4th_mean_error(k) = mean(abs(fi_data).^4) - abs_X_4th_power_mean(start);
 end
 
-max(abs(X_acc_error))
-max(abs(X_sq_acc_error))
-max(abs(X_cube_acc_error))
-max(abs(abs_X_sq_acc_error))
-max(abs(abs_X_4th_acc_error))
+max(abs(X_mean_error))
+max(abs(X_sq_mean_error))
+max(abs(X_cube_mean_error))
+max(abs(abs_X_sq_mean_error))
+max(abs(abs_X_4th_mean_error))
 
 %% Error on rounded accumulated outputs
 m_x_rounded = m_x_re_rounded + 1j*m_x_im_rounded;
@@ -78,9 +78,9 @@ X_cube_acc_rounded_error = zeros(1, n_vecs);
 abs_X_sq_acc_rounded_error = zeros(1, n_vecs);
 abs_X_4th_acc_rounded_error = zeros(1, n_vecs);
 
-sync_out_inds = find(sync_out_acc_rounded);
+acc_valid_inds = find(double(sync_out_acc_rounded));
 for k=1:n_vecs
-    start = sync_out_inds(k) + 1;
+    start = acc_valid_inds(k) + 1;
     fi_data = X_fi(vec_len*(k-1)+2:vec_len*k+1);
     X_acc_rounded_error(k) = 1./vec_len * sum(fi_data) - m_x_rounded(start);
     X_sq_acc_rounded_error(k) = sum(fi_data.^2) - X_sq_acc_rounded(start);
@@ -94,7 +94,7 @@ max(abs(X_cube_acc_rounded_error))
 max(abs(abs_X_sq_acc_rounded_error))
 
 %% Error on final moment calculations
-valid_inds = find(valid);
+valid_inds = find(double(valid));
 fourth_moment_diff = zeros(1, n_vecs);
 second_moment_diff = zeros(1, n_vecs);
 fl_error_num = zeros(1, n_vecs);
@@ -114,10 +114,11 @@ for k=1:n_vecs
 
     fourth_moment_diff(k) = fourth_central_moment(valid_inds(k)) - kurtosis_num_fi;
     second_moment_diff(k) = kurtosis_den_fi - kurtosis_den(valid_inds(k));
-
+    power_diff(k) = power(valid_inds(k)) - double(mean_power_fi);
 end
 second_moment_diff
 fourth_moment_diff
+power_diff
 fprintf('(num error)/num = %g\n', mean(abs(fl_error_num) / fourth_central_moment(valid_inds(k))));
 fprintf('(den error)/den = %g\n', mean(abs(fl_error_den) / kurtosis_den(valid_inds(k))));
 

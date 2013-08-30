@@ -85,7 +85,7 @@ for k=1:length(a_re)
         butterfly_fi(a_re(k), a_im(k), b_re(k), b_im(k), w_re(k), w_im(k));
 end
 
-delay = find(sync_out);
+delay = find(double(sync_out));
 apbw_fn = double(apbw_re(1:end-delay+1)) + 1j*double(apbw_im(1:end-delay+1));
 all(apbw_fn.' == apbw(delay:end))
 fprintf('Real error: %g\n', max(abs(real(apbw_fn.') - real(apbw(delay:end)))))

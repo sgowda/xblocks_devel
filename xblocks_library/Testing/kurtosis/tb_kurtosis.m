@@ -19,6 +19,7 @@ n_inputs = 8;
 [X8, X8_data] = data_burst(vec_len*n_vecs, T_sim, 1);
 
 %% Re-draw blocks
+tic
 config.source = @kurtosis_init_xblock;
 config.toplevel = subblockname(mdl_name, 'kurtosis');
 xBlock(config, {config.toplevel, 'acc_len', log2_vec_len, 'n_inputs', n_inputs});
@@ -28,13 +29,12 @@ xBlock(config, {config.toplevel, 'acc_len', log2_vec_len, 'n_inputs', n_inputs})
 set_param(mdl_name, 'StopTime', num2str(T_sim-1));
 
 % Run simulation
-tic
 sim(mdl_name)
 toc
 
 %% Verify
 % Error on final moment calculations
-valid_inds = find(valid);
+valid_inds = find(double(valid));
 valid_inds = valid_inds(n_inputs+1:end);
 num_error = zeros(n_inputs, n_vecs);
 den_error = zeros(n_inputs, n_vecs);

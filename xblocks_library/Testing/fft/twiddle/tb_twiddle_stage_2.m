@@ -25,7 +25,7 @@ sim(mdl_name)
 
 %% Verify
 bw = bw_re + 1j*bw_im;
-output_start = find(sync_out) + 1;
+output_start = find(double(sync_out)) + 1;
 coeff = b_data.' ./ bw(output_start : output_start + fft_length -1 );
 
 coeff_switching_period = 2^FFTSize / 2^stage;

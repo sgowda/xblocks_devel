@@ -41,7 +41,7 @@ set_param(mdl_name, 'StopTime', num2str(T_sim-1));
 sim(mdl_name)
 
 %% Verify
-output_start = find(biplex_sync_out) + 1;
+output_start = find(double(biplex_sync_out)) + 1;
 pol1_bits_lost = log2(max(abs(biplex_out1(output_start:output_start+fft_length - 1) - fft(pol1_data).'))/2^-17);
 pol2_bits_lost = log2(max(abs(biplex_out2(output_start:output_start+fft_length - 1) - fft(pol2_data).'))/2^-17);
 pol3_bits_lost = log2(max(abs(biplex_out3(output_start:output_start+fft_length - 1) - fft(pol3_data).'))/2^-17);
