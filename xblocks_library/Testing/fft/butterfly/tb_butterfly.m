@@ -78,9 +78,9 @@ end
 
 delay = find(double(sync_out));
 apbw_fn = double(apbw_re(1:end-delay+1)) + 1j*double(apbw_im(1:end-delay+1));
-all(apbw_fn.' == apbw(delay:end))
+function_matches_block = all(apbw_fn.' == apbw(delay:end)) && all(ambw_fn.' == ambw(delay:end))
 
 ambw_fn = double(ambw_re(1:end-delay+1)) + 1j*double(ambw_im(1:end-delay+1));
-all(ambw_fn.' == ambw(delay:end))
+
 
 commandwindow
