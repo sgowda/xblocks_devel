@@ -9,6 +9,7 @@ Configuring MATLAB
 ==================
 Add the following lines (or similar) to your MATLAB startup.m file:
 
+```code
 homedir = getenv('HOME');
 xblocks_lib_path = 'lib/xblocks_devel/xblocks_library';
 addpath(fullfile(homedir, xblocks_lib_path))
@@ -20,5 +21,5 @@ addpath(fullfile(homedir, xblocks_lib_path, 'fixed_point_dsp'))
 addpath(fullfile(homedir, xblocks_lib_path, 'scripting'))
 addpath(fullfile(homedir, xblocks_lib_path, 'automation'))
 addpath(fullfile(homedir, xblocks_lib_path, 'gen_test_signals'))
-
-where xblocks_lib_path should change depending on where 
+```
+where xblocks_lib_path should change depending on where you've checked out the repository 
