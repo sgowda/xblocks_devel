@@ -48,15 +48,10 @@ All test cases are stored in subdirectories of
 addpath(fullfile(homedir, xblocks_lib_path, 'Testing'))
 ```
 
-New testbenches should be created by
-1. mkdir testing/blktype/subblkname; cd testing/blktype/subblkname
-where 'blktype'  is a categorization for the block (e.g. fft, vacc, binary_signal, etc.)
-and subblkname is the name of the actual block being tested, i.e. the init script
-would be named <subblkname>_init_xblock.m
-2. Call the function create_tb.m, which should be on the path if startup.m
-was properly set.  This will create 2 files, a testbench script file and a
+New testbenches should be created by:
 
-3. From the Simulink library browser, pull appropriate blocks from the 
-'MATLAB data xfer' library, which has been configured to be the browser name
-for the simulink_xsg_bridge library file if you followed the step for the
-sl_customization.m file above. 
+1. mkdir testing/blktype/subblkname; cd testing/blktype/subblkname where 'blktype'  is a categorization for the block (e.g. fft, vacc, binary_signal, etc.) and subblkname is the name of the actual block being tested, i.e. the init script would be named <subblkname>_init_xblock.m
+
+2. Call the function create_tb.m, which should be on the path if startup.m was properly set.  This will create 2 files, a testbench script file and a simulnk model file. 
+
+3. From the Simulink library browser, pull appropriate blocks from the 'MATLAB data xfer' library, which has been configured to be the browser name  for the simulink_xsg_bridge library file if you followed the step for the sl_customization.m file above.
