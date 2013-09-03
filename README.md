@@ -34,6 +34,29 @@ order,
 ln -s $HOME/lib/xblocks_library/sl_customization.m $HOME/Documents/MATLAB/sl_customization.m
 ```
 
+Creating new blocks
+===================
+All blocks in this library are created with the xBlocks scripting functions 
+(see https://casper.berkeley.edu/wiki/XBlock_Scripting) for an overview of how these scripting
+functions can be used to draw blocks.  This has certain advantages and disadvantages over the
+standard simulink drawing methods.  Primarily, the tradeoff is that drawing takes a bit longer 
+than the standard CASPER library methods of block-drawing, as there is some redundancy, 
+but after this cost is paid, your block becomes library version independent.  In addition, because
+the library blocks are now fully text-based, they can actually be version controlled. The value of this
+tradeoff is debatable and ultimately comes down to personal preference. 
+
+To aid in the creation of new blocks, the functions disp_params.m and get_mask_config.m have
+been added to ```code xblocks_library/scripting/```.  These functions display print the current
+parameters of a block (in the case of the second function, just the Mask parameters).  These can be
+useful because while scripting blocks, it can be quite annoying to determine the parameter *names* that
+need to be set as there is no master-list of parameter names. 
+
+Block generator functions
+=========================
+The xBlock interface, while purely text, can be a bit clunky. To combat this, as well as improve the
+compactness of the block definitions, this library includes a set of functions that we are calling 
+'block generator functions'.  The idea here is that 
+
 Testing infrastructure
 ======================
 Testbenches for this library are handled primarily through MATLAB functional 
@@ -50,7 +73,7 @@ addpath(fullfile(homedir, xblocks_lib_path, 'Testing'))
 
 New testbenches should be created by:
 
-1. mkdir testing/blktype/subblkname; cd testing/blktype/subblkname where 'blktype'  is a categorization for the block (e.g. fft, vacc, binary_signal, etc.) and subblkname is the name of the actual block being tested, i.e. the init script would be named <subblkname>_init_xblock.m
+1. ```code mkdir testing/blktype/subblkname; cd testing/blktype/subblkname``` where 'blktype'  is a categorization for the block (e.g. fft, vacc, binary_signal, etc.) and subblkname is the name of the actual block being tested, i.e. the init script would be named <subblkname>_init_xblock.m
 
 2. Call the function create_tb.m, which should be on the path if startup.m was properly set.  This will create 2 files, a testbench script file and a simulnk model file. 
 
