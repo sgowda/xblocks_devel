@@ -9,6 +9,7 @@ eval(mdl_name); % open design
 T_sim = 100;
 
 %% Simulate
-start_sim(mdl_name, T_sim);
+set_param(mdl_name, 'StopTime', num2str(T_sim - 1));
+sim(mdl_name)
 
 %% Verify
