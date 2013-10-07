@@ -93,22 +93,16 @@ Counter_out1 = xSignal;
 SliceLow_out1 = xSignal;
 
 zero = const('Zero', 0, fi_dtype(0, max_accum, 0));
-
 din_del = xblock_new_bus(n_inputs, 1);
-
 xblock_delay(din, din_del', 'din', mux_latency+1, 'Register');
-
 end_of_frame = and_gate('AND', ValidCompare_out1, SyncCompare_out1);
-
 acc_en = neq_comp('AccEnCompare', Slice_out1, zero, 'latency', 1);
-
 counter_rst = or_gate('OR', sync, end_of_frame);
 
 Counter = xBlock(struct('source', 'Counter', 'name', 'Counter'), ...
     struct('n_bits', max_accum + veclen, 'rst', 'on', 'use_rpm', 'on'), ...
     {counter_rst}, {Counter_out1});
 
-% block: untitled1/vacc_init_xblock/Slice
 Slice = xBlock(struct('source', 'Slice', 'name', 'Slice'), ...
     struct('nbits', max_accum, 'mode', 'Upper Bit Location + Width'), ...
     {Counter_out1}, {Slice_out1});
@@ -157,23 +151,37 @@ if serialize_output_streams
         {counter_rst}, {addr_count});
     
     % slice bits for mux selector and addr
-    count_slices = slice_partition('ser_counter_sl', addr_count, [veclen, log2_n_inputs]);
-    bram_addr = count_slices{1};
-    mux_sel = count_slices{2};
-    mux_sel = delay_srl('read_latency1', mux_sel, bram_latency);
-       
+    if veclen == 0
+        bram_addr = const('zero', 0, fi_dtype(0, 32, 0));
+        mux_sel = addr_count;
+        mux_sel = delay_srl('read_latency1', mux_sel, bram_latency);
+    else
+        count_slices = slice_partition('ser_counter_sl', addr_count, [veclen, log2_n_inputs]);
+        bram_addr = count_slices{1};
+        mux_sel = count_slices{2};
+        mux_sel = delay_srl('read_latency1', mux_sel, bram_latency);
+    end
+    
     % valid signal
     sync_out = delay_srl('read_latency2', counter_rst, mux_serializing_latency + bram_latency - 1); % minus 1 is for the edge detector latency
     xBlock(struct('source', @pulse_ext_init_xblock, 'name', 'valid_gen'), ...
         {[], 'pulse_len', 2^veclen*n_inputs}, {sync_out}, {valid});
 
-    % instatiate single-port RAMs
-    config.source = 'Single Port RAM';
+    % instatiate buffers
     bram_outputs = xblock_new_bus(n_inputs, 1);
-    for k=1:n_inputs
-        config.name = sprintf('mem%d', k);
-        xBlock(config, {'depth', 2^veclen, 'latency', bram_latency}, ...
-            {bram_addr, vacc_dout{k}, acc_valid}, {bram_outputs{k}});
+    if veclen == 0
+        % use register with enable
+        for k=1:n_inputs
+            xBlock(struct('source', 'Register', 'name', sprintf('mem%d', k)), ...
+                {'en', 'on'}, {vacc_dout{k}, acc_valid}, {bram_outputs{k}});
+        end
+    else
+        config.source = 'Single Port RAM';
+        for k=1:n_inputs
+            config.name = sprintf('mem%d', k);
+            xBlock(config, {'depth', 2^veclen, 'latency', bram_latency}, ...
+                {bram_addr, vacc_dout{k}, acc_valid}, {bram_outputs{k}});
+        end
     end
     
     bram_sel = mux_select('mux', mux_sel, bram_outputs, 'latency', mux_serializing_latency);
@@ -195,5 +203,3 @@ if ~isempty(blk) && ~strcmp(blk(1), '/')
     fmtstr = sprintf('vector_length=2^%d, inputs=%d\nmax_accumulations=2^%d', veclen, n_inputs, max_accum);
     set_param(blk, 'AttributesFormatString', fmtstr);
 end
-
-
