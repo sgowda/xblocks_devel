@@ -35,7 +35,6 @@ toc
 %% Verify
 % Error on final moment calculations
 valid_inds = find(double(valid));
-valid_inds = valid_inds(n_inputs+1:end);
 num_error = zeros(n_inputs, n_vecs);
 den_error = zeros(n_inputs, n_vecs);
 
