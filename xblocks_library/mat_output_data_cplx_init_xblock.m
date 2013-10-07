@@ -39,7 +39,7 @@ xBlock(struct('source', simulink_ri_to_c, 'name', 'ri_to_c'), ...
 
 % to_workspace_input = xSignal();
 xBlock( struct('source', 'simulink/Sinks/To Workspace', 'name', 'workspace_output'), ...
-    {'VariableName', var_name, 'SaveFormat', SaveFormat}, {cplx}, {});
+    {'VariableName', var_name, 'SaveFormat', SaveFormat, 'FixptAsFi', 'on'}, {cplx}, {});
 
 end
 
