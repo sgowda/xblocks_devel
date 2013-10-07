@@ -43,7 +43,9 @@ type_x = fi_dtype(1, 18, 17);
 [x_3rd_mean_im, x_3rd_mean_im_dtype]   = scale_fi('scale8', x_3rd_acc_im, -acc_len);
 
 % calculate central moments from origin moments
-[num, den, mean_power] = kurtosis_moment_calc_norm_inputs_fi(x_mean_re, x_mean_im, x_sq_mean_re, x_sq_mean_im, abs_x_sq_mean, abs_x_4th_mean, x_3rd_mean_re, x_3rd_mean_im);
+[num, den, mean_power] = kurtosis_moment_calc_norm_inputs_fi(x_mean_re, ...
+    x_mean_im, x_sq_mean_re, x_sq_mean_im, abs_x_sq_mean, abs_x_4th_mean, ...
+    x_3rd_mean_re, x_3rd_mean_im, 'acc_len', acc_len);
 
 % use floating-point division to get the kurtosis ratio (not used in hardware)
 kappa_x = double(num)/double(den) - 2;
